@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "registration";
+
+service RegistrationService {
+  rpc CreateRegistration (RegistrationRequest) returns (RegistrationResponse);
+}
+
+message RegistrationRequest {
+  string eventId = 1;
+  string attendeeName = 2;
+  string attendeeEmail = 3;
+}
+
+message RegistrationResponse {
+  string registrationId = 1;
+  string status = 2;
+}

@@ -1,0 +1,12 @@
+### POST request to create new event entity
+POST http://localhost:4000/events
+Content-Type: application/json
+
+{
+  "title": "Springfield Java Meetup",
+  "organizerEmail": "organizer.springfield@example.com",
+  "venue": "Springfield Community Hall",
+  "eventDate": "2026-06-15",
+  "createdDate": "2026-05-01"
+}
+###

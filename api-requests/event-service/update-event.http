@@ -1,0 +1,12 @@
+### PUT request to update event
+PUT http://localhost:4000/events/123e4567-e89b-12d3-a456-426614174000
+Content-Type: application/json
+
+{
+  "venue": "Springfield Tech Hub",
+  "eventDate": "2026-06-20",
+  "organizerEmail": "organizer.springfield@example.com",
+  "title": "Springfield Java Meetup UPDATED"
+}
+
+###

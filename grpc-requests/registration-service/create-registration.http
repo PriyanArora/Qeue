@@ -1,0 +1,9 @@
+#host on which grpc working/ name of service/ name of protobuf method
+GRPC localhost:9001/RegistrationService/CreateRegistration
+Content-Type: application/json
+
+{
+  "eventId" : "123e4567-e89b-12d3-a456-426614174000",
+  "attendeeName" : "John Doe",
+  "attendeeEmail" : "john@example.com"
+}
