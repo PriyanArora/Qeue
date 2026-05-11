@@ -1,0 +1,47 @@
+asyncapi: 3.0.0
+info:
+  title: EventForge Platform Events Draft
+  version: 0.1.0
+  description: Phase 2 event-name draft only; payload schemas and bindings land in later queue phases.
+x-exchange:
+  name: eventforge.events
+  type: topic
+channels:
+  eventPublished:
+    address: event.published.v1
+    messages:
+      EventPublished:
+        $ref: "#/components/messages/EventPublished"
+    x-exchange: eventforge.events
+  eventCancelled:
+    address: event.cancelled.v1
+    messages:
+      EventCancelled:
+        $ref: "#/components/messages/EventCancelled"
+    x-exchange: eventforge.events
+  registrationConfirmed:
+    address: registration.confirmed.v1
+    messages:
+      RegistrationConfirmed:
+        $ref: "#/components/messages/RegistrationConfirmed"
+    x-exchange: eventforge.events
+  registrationCancelled:
+    address: registration.cancelled.v1
+    messages:
+      RegistrationCancelled:
+        $ref: "#/components/messages/RegistrationCancelled"
+    x-exchange: eventforge.events
+components:
+  messages:
+    EventPublished:
+      name: EventPublished
+      title: EventPublished
+    EventCancelled:
+      name: EventCancelled
+      title: EventCancelled
+    RegistrationConfirmed:
+      name: RegistrationConfirmed
+      title: RegistrationConfirmed
+    RegistrationCancelled:
+      name: RegistrationCancelled
+      title: RegistrationCancelled

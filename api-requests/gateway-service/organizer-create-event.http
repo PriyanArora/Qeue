@@ -1,0 +1,17 @@
+@baseUrl = http://localhost:8080
+@accessToken = paste-organizer-access-token-from-login-response
+
+### Organizer create draft through gateway
+POST {{baseUrl}}/api/organizer/events
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Gateway Java Meetup",
+  "description": "Created through the API gateway.",
+  "venueName": "Gateway Hall",
+  "venueCity": "Springfield",
+  "startsAt": "2026-09-01T14:00:00Z",
+  "endsAt": "2026-09-01T16:00:00Z",
+  "capacity": 50
+}

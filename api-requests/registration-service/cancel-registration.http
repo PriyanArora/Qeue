@@ -1,0 +1,6 @@
+@baseUrl = http://localhost:8080
+@attendeeToken = paste-attendee-access-token-from-login-response
+@registrationId = paste-registration-id-here
+
+DELETE {{baseUrl}}/api/registrations/{{registrationId}}
+Authorization: Bearer {{attendeeToken}}

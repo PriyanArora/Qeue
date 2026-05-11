@@ -1,0 +1,12 @@
+@baseUrl = http://localhost:4001
+
+### Register organizer
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "new.organizer@example.com",
+  "password": "ValidPassword1!",
+  "displayName": "New Organizer",
+  "role": "ORGANIZER"
+}

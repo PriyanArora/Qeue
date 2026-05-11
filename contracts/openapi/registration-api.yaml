@@ -1,0 +1,27 @@
+openapi: 3.1.0
+info:
+  title: EventForge Registration API Draft
+  version: 0.1.0
+  description: Phase 2 route-name draft only; schemas and capacity rules land in later phases.
+paths:
+  /api/events/{eventId}/registrations:
+    post:
+      operationId: reserveSeat
+      summary: reserve seat
+      responses:
+        "501":
+          description: Not implemented until the registration phases.
+  /api/registrations/{registrationId}:
+    delete:
+      operationId: cancelReservation
+      summary: cancel reservation
+      responses:
+        "501":
+          description: Not implemented until the registration phases.
+  /api/me/registrations:
+    get:
+      operationId: listMyRegistrations
+      summary: list my registrations
+      responses:
+        "501":
+          description: Not implemented until the registration phases.

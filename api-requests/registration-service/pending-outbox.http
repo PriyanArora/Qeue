@@ -1,0 +1,3 @@
+@registrationServiceBaseUrl = http://localhost:4002
+
+GET {{registrationServiceBaseUrl}}/api/internal/outbox/pending

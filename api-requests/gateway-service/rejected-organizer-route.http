@@ -1,0 +1,17 @@
+@baseUrl = http://localhost:8080
+@accessToken = paste-attendee-access-token-from-login-response
+
+### Attendee token rejected from organizer route
+POST {{baseUrl}}/api/organizer/events
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Should Be Rejected",
+  "description": "Attendees cannot create organizer events.",
+  "venueName": "Gateway Hall",
+  "venueCity": "Springfield",
+  "startsAt": "2026-09-01T14:00:00Z",
+  "endsAt": "2026-09-01T16:00:00Z",
+  "capacity": 50
+}

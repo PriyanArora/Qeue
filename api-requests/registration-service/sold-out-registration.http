@@ -1,0 +1,11 @@
+@baseUrl = http://localhost:8080
+@attendeeToken = paste-attendee-access-token-from-login-response
+@soldOutEventId = 11111111-1111-1111-1111-111111111005
+
+POST {{baseUrl}}/api/events/{{soldOutEventId}}/registrations
+Authorization: Bearer {{attendeeToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "manual-sold-out-001"
+}

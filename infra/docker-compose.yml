@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eventforge-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-eventforge_admin}
+      POSTGRES_USER: ${POSTGRES_USER:-eventforge_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-eventforge_identity}
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-eventforge_identity_user}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-change-me-local-only}
+      EVENT_DB_NAME: ${EVENT_DB_NAME:-eventforge_event}
+      EVENT_DB_USERNAME: ${EVENT_DB_USERNAME:-eventforge_event_user}
+      EVENT_DB_PASSWORD: ${EVENT_DB_PASSWORD:-change-me-local-only}
+      REGISTRATION_DB_NAME: ${REGISTRATION_DB_NAME:-eventforge_registration}
+      REGISTRATION_DB_USERNAME: ${REGISTRATION_DB_USERNAME:-eventforge_registration_user}
+      REGISTRATION_DB_PASSWORD: ${REGISTRATION_DB_PASSWORD:-change-me-local-only}
+      NOTIFICATION_DB_NAME: ${NOTIFICATION_DB_NAME:-eventforge_notification}
+      NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-eventforge_notification_user}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-change-me-local-only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - eventforge-postgres-data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: eventforge-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-eventforge_local}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change-me-local-only}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - eventforge-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: eventforge-mailhog
+    ports:
+      - "${MAILHOG_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  eventforge-postgres-data:
+  eventforge-rabbitmq-data:

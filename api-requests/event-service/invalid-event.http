@@ -1,0 +1,18 @@
+@baseUrl = http://localhost:4000
+@organizerId = aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1
+
+### Reject invalid capacity
+POST {{baseUrl}}/api/organizer/events
+X-User-Id: {{organizerId}}
+X-User-Role: ORGANIZER
+Content-Type: application/json
+
+{
+  "title": "Invalid Event",
+  "description": "Capacity must be at least one.",
+  "venueName": "Springfield Community Hall",
+  "venueCity": "Springfield",
+  "startsAt": "2026-08-15T14:00:00Z",
+  "endsAt": "2026-08-15T17:00:00Z",
+  "capacity": 0
+}

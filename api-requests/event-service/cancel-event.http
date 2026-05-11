@@ -1,0 +1,8 @@
+@baseUrl = http://localhost:4000
+@organizerId = aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1
+@eventId = 11111111-1111-1111-1111-111111111003
+
+### Cancel event
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/cancel
+X-User-Id: {{organizerId}}
+X-User-Role: ORGANIZER

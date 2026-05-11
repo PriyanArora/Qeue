@@ -1,0 +1,4 @@
+@baseUrl = http://localhost:8080
+
+### Public event list through gateway
+GET {{baseUrl}}/api/events

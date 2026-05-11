@@ -1,12 +1,19 @@
-### POST request to create new event entity
-POST http://localhost:4000/events
+@baseUrl = http://localhost:4000
+@organizerId = aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1
+
+### Create draft event
+POST {{baseUrl}}/api/organizer/events
+X-User-Id: {{organizerId}}
+X-User-Role: ORGANIZER
 Content-Type: application/json
 
 {
   "title": "Springfield Java Meetup",
-  "organizerEmail": "organizer.springfield@example.com",
-  "venue": "Springfield Community Hall",
-  "eventDate": "2026-06-15",
-  "createdDate": "2026-05-01"
+  "description": "A practical meetup for Java web application builders.",
+  "venueName": "Springfield Community Hall",
+  "venueCity": "Springfield",
+  "startsAt": "2026-08-15T14:00:00Z",
+  "endsAt": "2026-08-15T17:00:00Z",
+  "capacity": 80
 }
 ###
