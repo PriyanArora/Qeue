@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: EventForge Event API Draft
+  version: 0.1.0
+  description: Phase 2 route-name draft only; schemas and event lifecycle rules land in later phases.
+paths:
+  /api/events:
+    get:
+      operationId: publicList
+      summary: public list
+      responses:
+        "501":
+          description: Not implemented until the event lifecycle phases.
+  /api/events/{eventId}:
+    get:
+      operationId: publicDetail
+      summary: public detail
+      responses:
+        "501":
+          description: Not implemented until the event lifecycle phases.
+  /api/organizer/events:
+    post:
+      operationId: organizerCreate
+      summary: organizer create
+      responses:
+        "501":
+          description: Not implemented until the event lifecycle phases.
+  /api/organizer/events/{eventId}:
+    put:
+      operationId: organizerUpdate
+      summary: organizer update
+      responses:
+        "501":
+          description: Not implemented until the event lifecycle phases.
+  /api/organizer/events/{eventId}/publish:
+    post:
+      operationId: publish
+      summary: publish
+      responses:
+        "501":
+          description: Not implemented until the event lifecycle phases.
+  /api/organizer/events/{eventId}/cancel:
+    post:
+      operationId: cancel
+      summary: cancel
+      responses:
+        "501":
+          description: Not implemented until the event lifecycle phases.

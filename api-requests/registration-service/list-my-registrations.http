@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:8080
+@attendeeToken = paste-attendee-access-token-from-login-response
+
+GET {{baseUrl}}/api/me/registrations
+Authorization: Bearer {{attendeeToken}}

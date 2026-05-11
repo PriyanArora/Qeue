@@ -1,0 +1,21 @@
+@baseUrl = http://localhost:8080
+@attendeeToken = paste-attendee-access-token-from-login-response
+@eventId = 11111111-1111-1111-1111-111111111002
+
+POST {{baseUrl}}/api/events/{{eventId}}/registrations
+Authorization: Bearer {{attendeeToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "manual-duplicate-first"
+}
+
+###
+
+POST {{baseUrl}}/api/events/{{eventId}}/registrations
+Authorization: Bearer {{attendeeToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "manual-duplicate-second"
+}

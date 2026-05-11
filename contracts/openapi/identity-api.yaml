@@ -1,0 +1,27 @@
+openapi: 3.1.0
+info:
+  title: EventForge Identity API Draft
+  version: 0.1.0
+  description: Phase 2 route-name draft only; schemas and security details land in later phases.
+paths:
+  /api/auth/register:
+    post:
+      operationId: register
+      summary: register
+      responses:
+        "501":
+          description: Not implemented until the identity-service phase.
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: login
+      responses:
+        "501":
+          description: Not implemented until the identity-service phase.
+  /api/auth/me:
+    get:
+      operationId: me
+      summary: me
+      responses:
+        "501":
+          description: Not implemented until the identity-service phase.

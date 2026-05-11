@@ -1,0 +1,6 @@
+@baseUrl = http://localhost:4001
+@accessToken = paste-accessToken-from-login-response
+
+### Get current user
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}

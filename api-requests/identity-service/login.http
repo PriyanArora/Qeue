@@ -1,0 +1,10 @@
+@baseUrl = http://localhost:4001
+
+### Login local organizer
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "organizer@eventforge.local",
+  "password": "LocalDevPassword1!"
+}
