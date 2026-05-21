@@ -1,10 +1,10 @@
-# EventForge
+# Event Management platform
 
-EventForge is a learning portfolio project for building a small Java event-management platform. The target system is a microservice web platform where organizers publish events and attendees reserve seats without overselling capacity.
+Event Management platform is a learning portfolio project for building a small Java event-management platform. I won't give this project a cliche saas name hence this shall remain nameless. The target system is a microservice web platform where organizers publish events and attendees reserve seats without overselling capacity.
 
 ## Current Baseline
 
-This repository has local work through Phase 10 in progress. The current code is a renamed baseline from an earlier patient-management project, with the copied service workspace now carrying the newer EventForge implementation:
+This repository has local work through Phase 10 in progress. The current code is a renamed baseline from an earlier patient-management project, with the copied service workspace now carrying the newer Event Management platform implementation:
 
 - `event-service/` is a Spring Boot REST CRUD service for event records.
 - `registration-service/` is a Spring Boot gRPC stub for creating a registration response.
@@ -78,8 +78,8 @@ Run the Phase 5 event-service against local Postgres after starting Compose:
 
 ```sh
 cd services/event-service
-EVENT_DB_URL=jdbc:postgresql://localhost:5432/eventforge_event \
-EVENT_DB_USERNAME=eventforge_event_user \
+EVENT_DB_URL=jdbc:postgresql://localhost:5432/Event Management platform_event \
+EVENT_DB_USERNAME=Event Management platform_event_user \
 EVENT_DB_PASSWORD=change-me-local-only \
 ./mvnw spring-boot:run
 ```
@@ -95,8 +95,8 @@ Run the Phase 6 identity-service against local Postgres after starting Compose:
 
 ```sh
 cd services/identity-service
-IDENTITY_DB_URL=jdbc:postgresql://localhost:5432/eventforge_identity \
-IDENTITY_DB_USERNAME=eventforge_identity_user \
+IDENTITY_DB_URL=jdbc:postgresql://localhost:5432/Event Management platform_identity \
+IDENTITY_DB_USERNAME=Event Management platform_identity_user \
 IDENTITY_DB_PASSWORD=change-me-local-only \
 IDENTITY_JWT_SECRET=replace-with-local-identity-secret-min-32-chars \
 ./mvnw spring-boot:run
@@ -104,8 +104,8 @@ IDENTITY_JWT_SECRET=replace-with-local-identity-secret-min-32-chars \
 
 Local seed accounts are development-only and both use password `LocalDevPassword1!`:
 
-- `organizer@eventforge.local` with role `ORGANIZER`
-- `attendee@eventforge.local` with role `ATTENDEE`
+- `organizer@Event Management platform.local` with role `ORGANIZER`
+- `attendee@Event Management platform.local` with role `ATTENDEE`
 
 Run the gateway after the services it proxies are running. Phase 7 needs event-service and identity-service; Phase 8-10 registration routes also need registration-service.
 
@@ -126,8 +126,8 @@ Run the Phase 8-10 registration-service against local Postgres after starting Co
 
 ```sh
 cd services/registration-service
-REGISTRATION_DB_URL=jdbc:postgresql://localhost:5432/eventforge_registration \
-REGISTRATION_DB_USERNAME=eventforge_registration_user \
+REGISTRATION_DB_URL=jdbc:postgresql://localhost:5432/Event Management platform_registration \
+REGISTRATION_DB_USERNAME=Event Management platform_registration_user \
 REGISTRATION_DB_PASSWORD=change-me-local-only \
 ./mvnw spring-boot:run
 ```
@@ -137,7 +137,7 @@ After event-service, identity-service, registration-service, and gateway-service
 ```sh
 curl -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"attendee@eventforge.local","password":"LocalDevPassword1!"}'
+  -d '{"email":"attendee@Event Management platform.local","password":"LocalDevPassword1!"}'
 curl http://localhost:8080/api/me/registrations \
   -H "Authorization: Bearer <accessToken>"
 ```
