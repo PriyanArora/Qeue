@@ -3,6 +3,7 @@
 !.env.example
 
 .codex/
+codex-folder/
 
 target/
 build/
