@@ -1,0 +1,431 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-service
+  template:
+    metadata:
+      labels:
+        app: identity-service
+    spec:
+      containers:
+        - name: identity-service
+          image: qeue/identity-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4001
+          env:
+            - name: IDENTITY_SERVICE_PORT
+              value: "4001"
+            - name: IDENTITY_DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: qeue-config
+                  key: IDENTITY_DB_URL
+            - name: IDENTITY_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: IDENTITY_DB_USERNAME
+            - name: IDENTITY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: IDENTITY_DB_PASSWORD
+            - name: IDENTITY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: IDENTITY_JWT_SECRET
+            - name: IDENTITY_JWT_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: qeue-config
+                  key: IDENTITY_JWT_ISSUER
+          readinessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4001
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4001
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-service
+spec:
+  selector:
+    app: identity-service
+  ports:
+    - port: 4001
+      targetPort: 4001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-service
+  template:
+    metadata:
+      labels:
+        app: event-service
+    spec:
+      containers:
+        - name: event-service
+          image: qeue/event-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - configMapRef:
+                name: qeue-config
+          env:
+            - name: EVENT_SERVICE_PORT
+              value: "4000"
+            - name: EVENT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: EVENT_DB_USERNAME
+            - name: EVENT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: EVENT_DB_PASSWORD
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: RABBITMQ_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4000
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-service
+spec:
+  selector:
+    app: event-service
+  ports:
+    - port: 4000
+      targetPort: 4000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registration-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registration-service
+  template:
+    metadata:
+      labels:
+        app: registration-service
+    spec:
+      containers:
+        - name: registration-service
+          image: qeue/registration-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4002
+            - containerPort: 9001
+          envFrom:
+            - configMapRef:
+                name: qeue-config
+          env:
+            - name: REGISTRATION_SERVICE_PORT
+              value: "4002"
+            - name: REGISTRATION_GRPC_PORT
+              value: "9001"
+            - name: REGISTRATION_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: REGISTRATION_DB_USERNAME
+            - name: REGISTRATION_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: REGISTRATION_DB_PASSWORD
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: RABBITMQ_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4002
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4002
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registration-service
+spec:
+  selector:
+    app: registration-service
+  ports:
+    - name: http
+      port: 4002
+      targetPort: 4002
+    - name: grpc
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-worker
+  template:
+    metadata:
+      labels:
+        app: notification-worker
+    spec:
+      containers:
+        - name: notification-worker
+          image: qeue/notification-worker:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4003
+          envFrom:
+            - configMapRef:
+                name: qeue-config
+          env:
+            - name: NOTIFICATION_WORKER_PORT
+              value: "4003"
+            - name: NOTIFICATION_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: NOTIFICATION_DB_USERNAME
+            - name: NOTIFICATION_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: NOTIFICATION_DB_PASSWORD
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: RABBITMQ_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4003
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 4003
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-worker
+spec:
+  selector:
+    app: notification-worker
+  ports:
+    - port: 4003
+      targetPort: 4003
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-service
+  template:
+    metadata:
+      labels:
+        app: gateway-service
+    spec:
+      containers:
+        - name: gateway-service
+          image: qeue/gateway-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GATEWAY_PORT
+              value: "8080"
+            - name: IDENTITY_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: qeue-config
+                  key: IDENTITY_SERVICE_URL
+            - name: EVENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: qeue-config
+                  key: EVENT_SERVICE_URL
+            - name: REGISTRATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: qeue-config
+                  key: REGISTRATION_SERVICE_URL
+            - name: IDENTITY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: qeue-secret
+                  key: IDENTITY_JWT_SECRET
+            - name: IDENTITY_JWT_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: qeue-config
+                  key: IDENTITY_JWT_ISSUER
+          readinessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/internal/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+spec:
+  selector:
+    app: gateway-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-client
+  template:
+    metadata:
+      labels:
+        app: web-client
+    spec:
+      containers:
+        - name: web-client
+          image: qeue/web-client:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-client
+spec:
+  selector:
+    app: web-client
+  ports:
+    - port: 80
+      targetPort: 80

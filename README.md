@@ -1,32 +1,33 @@
-# EventForge
+# Qeue
 
-EventForge is a learning portfolio project for building a small Java event-management platform. The target system is a microservice web platform where organizers publish events and attendees reserve seats without overselling capacity.
+Qeue is a learning portfolio project for building a small Java event-management platform. The target system is a microservice web platform where organizers publish events and attendees reserve seats without overselling capacity.
 
-## Current Baseline
+## Current Local State
 
-This repository has local work through Phase 10 in progress. The current code is a renamed baseline from an earlier patient-management project, with the copied service workspace now carrying the newer EventForge implementation:
+This repository now targets a full local Qeue platform: event setup, registration, attendee tickets, check-in, analytics, surveys, notifications, Compose, local Kubernetes manifests, and CI.
 
 - `event-service/` is a Spring Boot REST CRUD service for event records.
 - `registration-service/` is a Spring Boot gRPC stub for creating a registration response.
-- `services/event-service/` is the Phase 4/5 event lifecycle service with Phase 10 event outbox preparation, Flyway migrations, env-driven database configuration, public event browsing, organizer draft/update/publish/cancel routes, and integration tests.
-- `services/registration-service/` is the Phase 8-10 registration service with REST registration APIs, Flyway storage, PostgreSQL/Testcontainers test coverage, capacity-safe reservations, cancellation, and registration outbox rows.
-- `services/identity-service/` is the Phase 6 identity service with registration, login, `/api/auth/me`, BCrypt password hashes, HMAC-SHA256 JWTs, Flyway migrations, and integration tests.
-- `services/gateway-service/` is the Phase 7 gateway with JWT validation, route-level role guards, downstream proxying, and user header forwarding.
-- `services/notification-worker/` is a placeholder for later phases.
-- `contracts/openapi/` and `contracts/asyncapi/` contain Phase 2 draft route and event contracts.
-- `api-requests/event-service/` contains manual HTTP request examples for the Phase 5 event lifecycle endpoints.
+- `services/event-service/` owns event lifecycle, builder fields, registration questions, registration types, speakers, sessions, surveys, event outbox rows, and event projection messages.
+- `services/registration-service/` owns attendee registrations, answers, tickets, check-in, attendee lists, CSV export, analytics, survey responses, projected event inventory, and registration outbox rows.
+- `services/identity-service/` provides registration, login, `/api/auth/me`, BCrypt password hashes, HMAC-SHA256 JWTs, Flyway migrations, and integration tests.
+- `services/gateway-service/` validates JWTs, guards routes by role, proxies downstream APIs, and forwards trusted user headers.
+- `services/notification-worker/` consumes registration notification events, deduplicates them, writes notification logs, and can send to MailHog when enabled.
+- `web-client/` is a React/Vite TypeScript client for public browsing, auth, organizer setup, attendee registration, ticket display, check-in, analytics, and surveys.
+- `contracts/openapi/` and `contracts/asyncapi/` contain route and event contracts.
+- `api-requests/event-service/` contains manual HTTP request examples for event endpoints.
 - `grpc-requests/registration-service/` contains a manual gRPC request example for the registration stub.
-- `api-requests/registration-service/` contains manual HTTP request examples for the Phase 8-10 registration endpoints through the gateway plus direct outbox visibility.
-- `codex-folder/` contains the gated build plan and is the source of truth for future phases.
-
-The current local workspace does not yet include RabbitMQ message publishing, a React web client, Kubernetes manifests, or CI. Those are later gated phases.
+- `api-requests/registration-service/` contains manual HTTP request examples for registration endpoints.
+- `codex-folder/` contains concise project memory, current status, architecture notes, and implementation progress.
+- `codex-folder/explain/project-explanation.md` gives a short beginner-friendly explanation.
 
 ## Requirements
 
 - Java 21
 - Maven through each service's Maven wrapper
-- Docker is required for Phase 3 local infrastructure and registration-service Testcontainers tests
-- Node is not required until Phase 13
+- Docker is required for Compose, image builds, and registration-service Testcontainers tests
+- Node 22 LTS or newer and npm for `web-client`
+- `kubectl` with kustomize support for manifest validation or local Kubernetes apply
 
 ## Run Checks
 
@@ -42,24 +43,26 @@ From `registration-service/`:
 ./mvnw test
 ```
 
-From copied Phase 2 service locations:
+From active service locations:
 
 ```sh
 cd services/event-service && ./mvnw test
 cd services/identity-service && ./mvnw test
 cd services/gateway-service && ./mvnw test
 cd services/registration-service && ./mvnw test
+cd services/notification-worker && ./mvnw test
+cd web-client && npm install && npm test && npm run build
 ```
 
-There is no one-command full-platform app start yet. Docker Compose starts shared dependencies in Phase 3, gateway routing starts in Phase 7, registration workflows run through the gateway in Phase 8-10, the web client starts in Phase 13, and the complete local platform command starts in Phase 15.
-
-From the repository root, start Phase 3 local dependencies:
+From the repository root, start the full local platform:
 
 ```sh
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up --build
 ```
 
-Stop the local dependencies:
+Open `http://localhost:3000`. Gateway is available at `http://localhost:8080`.
+
+Stop the platform:
 
 ```sh
 docker compose -f infra/docker-compose.yml down
@@ -67,19 +70,19 @@ docker compose -f infra/docker-compose.yml down
 
 If your filesystem loses executable bits, run the same commands through `sh ./mvnw test` and restore the wrapper permissions before committing.
 
-Run the Phase 5 event-service locally with the default in-memory database:
+Run event-service locally with the default in-memory database:
 
 ```sh
 cd services/event-service
 ./mvnw spring-boot:run
 ```
 
-Run the Phase 5 event-service against local Postgres after starting Compose:
+Run event-service against local Postgres after starting Compose:
 
 ```sh
 cd services/event-service
-EVENT_DB_URL=jdbc:postgresql://localhost:5432/eventforge_event \
-EVENT_DB_USERNAME=eventforge_event_user \
+EVENT_DB_URL=jdbc:postgresql://localhost:5432/qeue_event \
+EVENT_DB_USERNAME=qeue_event_user \
 EVENT_DB_PASSWORD=change-me-local-only \
 ./mvnw spring-boot:run
 ```
@@ -91,12 +94,12 @@ curl http://localhost:4000/api/internal/health
 curl http://localhost:4000/api/events
 ```
 
-Run the Phase 6 identity-service against local Postgres after starting Compose:
+Run identity-service against local Postgres after starting Compose:
 
 ```sh
 cd services/identity-service
-IDENTITY_DB_URL=jdbc:postgresql://localhost:5432/eventforge_identity \
-IDENTITY_DB_USERNAME=eventforge_identity_user \
+IDENTITY_DB_URL=jdbc:postgresql://localhost:5432/qeue_identity \
+IDENTITY_DB_USERNAME=qeue_identity_user \
 IDENTITY_DB_PASSWORD=change-me-local-only \
 IDENTITY_JWT_SECRET=replace-with-local-identity-secret-min-32-chars \
 ./mvnw spring-boot:run
@@ -104,10 +107,10 @@ IDENTITY_JWT_SECRET=replace-with-local-identity-secret-min-32-chars \
 
 Local seed accounts are development-only and both use password `LocalDevPassword1!`:
 
-- `organizer@eventforge.local` with role `ORGANIZER`
-- `attendee@eventforge.local` with role `ATTENDEE`
+- `organizer@qeue.local` with role `ORGANIZER`
+- `attendee@qeue.local` with role `ATTENDEE`
 
-Run the gateway after the services it proxies are running. Phase 7 needs event-service and identity-service; Phase 8-10 registration routes also need registration-service.
+Run the gateway after identity-service, event-service, and registration-service are running.
 
 ```sh
 cd services/gateway-service
@@ -122,14 +125,46 @@ curl http://localhost:8080/api/internal/health
 curl http://localhost:8080/api/events
 ```
 
-Run the Phase 8-10 registration-service against local Postgres after starting Compose:
+Run registration-service against local Postgres after starting Compose:
 
 ```sh
 cd services/registration-service
-REGISTRATION_DB_URL=jdbc:postgresql://localhost:5432/eventforge_registration \
-REGISTRATION_DB_USERNAME=eventforge_registration_user \
+REGISTRATION_DB_URL=jdbc:postgresql://localhost:5432/qeue_registration \
+REGISTRATION_DB_USERNAME=qeue_registration_user \
 REGISTRATION_DB_PASSWORD=change-me-local-only \
 ./mvnw spring-boot:run
+```
+
+Run the notification-worker against local Postgres after starting Compose:
+
+```sh
+cd services/notification-worker
+NOTIFICATION_DB_URL=jdbc:postgresql://localhost:5432/qeue_notification \
+NOTIFICATION_DB_USERNAME=qeue_notification_user \
+NOTIFICATION_DB_PASSWORD=change-me-local-only \
+./mvnw spring-boot:run
+```
+
+Enable RabbitMQ publishers and listeners only after RabbitMQ is running:
+
+```sh
+RABBITMQ_LISTENER_ENABLED=true
+EVENT_OUTBOX_PUBLISHER_ENABLED=true
+REGISTRATION_OUTBOX_PUBLISHER_ENABLED=true
+```
+
+Run the web client locally:
+
+```sh
+cd web-client
+npm install
+VITE_API_BASE_URL=http://localhost:8080 npm run dev
+```
+
+Validate Kubernetes manifests:
+
+```sh
+kubectl kustomize deploy/k8s/overlays/local
 ```
 
 After event-service, identity-service, registration-service, and gateway-service are running, use the seed attendee through the gateway:
@@ -137,7 +172,7 @@ After event-service, identity-service, registration-service, and gateway-service
 ```sh
 curl -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"attendee@eventforge.local","password":"LocalDevPassword1!"}'
+  -d '{"email":"attendee@qeue.local","password":"LocalDevPassword1!"}'
 curl http://localhost:8080/api/me/registrations \
   -H "Authorization: Bearer <accessToken>"
 ```
@@ -146,27 +181,10 @@ curl http://localhost:8080/api/me/registrations \
 
 Copy `.env.example` to `.env` for local-only values when later phases need environment variables. Keep `.env` out of Git. The example file uses dummy local values only and does not contain real credentials.
 
-## Phase 1 Notes
+## Project Notes
 
-Phase 1 documents the project pivot and keeps the baseline honest. See:
-
-- `docs/legacy-service-map.md`
-- `docs/repo-critique.md`
-- `codex-folder/codex/Progress.md`
-
-## Phase 2 Notes
-
-Phase 2 defines the target workspace layout and contracts before adding new service behavior. See:
-
-- `docs/architecture/service-boundaries.md`
-- `contracts/openapi/identity-api.yaml`
-- `contracts/openapi/event-api.yaml`
-- `contracts/openapi/registration-api.yaml`
-- `contracts/asyncapi/event-platform-events.yaml`
-
-## Phase 3 Notes
-
-Phase 3 starts only Postgres, RabbitMQ, and MailHog. See:
-
-- `infra/docker-compose.yml`
-- `infra/README.md`
+- `codex-folder/codex/ProjectSummary.md` has architecture, boundaries, troubleshooting notes, and the legacy map.
+- `codex-folder/codex/Progress.md` has current status.
+- `codex-folder/codex/BuildFlow.md` has concise verification commands.
+- `codex-folder/codex/RepoStructure.md` explains the active folders.
+- `contracts/asyncapi/event-platform-events.yaml` has the queue contract.

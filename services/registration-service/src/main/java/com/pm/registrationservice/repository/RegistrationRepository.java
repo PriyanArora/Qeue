@@ -13,7 +13,11 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
 
     Optional<Registration> findByAttendeeIdAndIdempotencyKey(UUID attendeeId, String idempotencyKey);
 
-    Optional<Registration> findByIdAndAttendeeId(UUID id, UUID attendeeId);
-
     List<Registration> findByAttendeeIdOrderByCreatedAtDesc(UUID attendeeId);
+
+    List<Registration> findByEventIdOrderByCreatedAtDesc(UUID eventId);
+
+    Optional<Registration> findByEventIdAndTicketCodeHash(UUID eventId, String ticketCodeHash);
+
+    Optional<Registration> findFirstByEventIdAndAttendeeIdAndStatus(UUID eventId, UUID attendeeId, RegistrationStatus status);
 }

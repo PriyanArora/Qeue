@@ -14,8 +14,17 @@ public class EventInventory {
     @Column(nullable = false)
     private String title;
 
+    @Column
+    private UUID organizerId;
+
     @Column(nullable = false)
     private Instant startsAt;
+
+    @Column(length = 160)
+    private String venueName;
+
+    @Column(length = 80)
+    private String timezone;
 
     @Column(nullable = false)
     private Integer capacity;
@@ -47,12 +56,36 @@ public class EventInventory {
         this.title = title;
     }
 
+    public UUID getOrganizerId() {
+        return organizerId;
+    }
+
+    public void setOrganizerId(UUID organizerId) {
+        this.organizerId = organizerId;
+    }
+
     public Instant getStartsAt() {
         return startsAt;
     }
 
     public void setStartsAt(Instant startsAt) {
         this.startsAt = startsAt;
+    }
+
+    public String getVenueName() {
+        return venueName;
+    }
+
+    public void setVenueName(String venueName) {
+        this.venueName = venueName;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 
     public Integer getCapacity() {

@@ -2,16 +2,22 @@ package com.pm.registrationservice;
 
 import com.pm.registrationservice.dto.RegistrationRequestDTO;
 import com.pm.registrationservice.exception.ConflictException;
+import com.pm.registrationservice.messaging.EventInventoryConsumer;
+import com.pm.registrationservice.messaging.RegistrationOutboxPublisher;
 import com.pm.registrationservice.model.*;
 import com.pm.registrationservice.repository.EventInventoryRepository;
+import com.pm.registrationservice.repository.RegistrationOutboxRepository;
 import com.pm.registrationservice.repository.RegistrationRepository;
 import com.pm.registrationservice.service.RegistrationService;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -21,12 +27,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 class RegistrationControllerIntegrationTests {
     private static final UUID ATTENDEE_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1");
-    private static final String ATTENDEE_EMAIL = "attendee@eventforge.local";
+    private static final String ATTENDEE_EMAIL = "attendee@qeue.local";
 
     @Container
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
@@ -62,14 +72,42 @@ class RegistrationControllerIntegrationTests {
     private RegistrationRepository registrationRepository;
 
     @Autowired
+    private RegistrationOutboxRepository outboxRepository;
+
+    @Autowired
     private RegistrationService registrationService;
+
+    @Autowired
+    private EventInventoryConsumer eventInventoryConsumer;
+
+    @Autowired
+    private RegistrationOutboxPublisher outboxPublisher;
+
+    @MockitoBean
+    private RabbitTemplate rabbitTemplate;
 
     @Test
     void listsCurrentAttendeeRegistrations() throws Exception {
         mockMvc.perform(get("/api/me/registrations")
-                        .header("X-User-Id", UUID.randomUUID().toString()))
+                        .headers(attendeeHeaders(UUID.randomUUID(), "list@example.com")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void rejectsRegistrationRouteWithoutAttendeeRole() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("X-User-Id", UUID.randomUUID().toString());
+        headers.add("X-User-Email", "organizer@example.com");
+        headers.add("X-User-Role", "ORGANIZER");
+
+        mockMvc.perform(post("/api/events/{eventId}/registrations", eventId)
+                        .headers(headers)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationRequest("wrong-role-" + eventId)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Attendee role is required"));
     }
 
     @Test
@@ -283,9 +321,73 @@ class RegistrationControllerIntegrationTests {
                 .andExpect(jsonPath("$.message").value("Cannot cancel another attendee's registration"));
     }
 
+    @Test
+    void eventPublishedMessageUpsertsInventory() throws Exception {
+        UUID eventId = UUID.randomUUID();
+
+        eventInventoryConsumer.consumeEventMessage(eventMessage("EventPublished", eventId, "Projected Java Day", 44));
+
+        EventInventory inventory = inventoryRepository.findById(eventId).orElseThrow();
+        assertEquals("Projected Java Day", inventory.getTitle());
+        assertEquals(44, inventory.getCapacity());
+        assertEquals(0, inventory.getConfirmedCount());
+        assertEquals(EventStatus.PUBLISHED, inventory.getEventStatus());
+    }
+
+    @Test
+    void duplicateEventPublishedMessageDoesNotResetConfirmedCount() throws Exception {
+        UUID eventId = UUID.randomUUID();
+
+        eventInventoryConsumer.consumeEventMessage(eventMessage("EventPublished", eventId, "Projected Capacity Lab", 10));
+        EventInventory inventory = inventoryRepository.findById(eventId).orElseThrow();
+        inventory.setConfirmedCount(2);
+        inventoryRepository.saveAndFlush(inventory);
+
+        eventInventoryConsumer.consumeEventMessage(eventMessage("EventPublished", eventId, "Projected Capacity Lab", 10));
+
+        EventInventory projectedAgain = inventoryRepository.findById(eventId).orElseThrow();
+        assertEquals(2, projectedAgain.getConfirmedCount());
+        assertEquals(EventStatus.PUBLISHED, projectedAgain.getEventStatus());
+    }
+
+    @Test
+    void eventCancelledMessageMarksInventoryCancelled() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        inventoryRepository.saveAndFlush(inventory(eventId, 10, 3, EventStatus.PUBLISHED));
+
+        eventInventoryConsumer.consumeEventMessage(eventMessage("EventCancelled", eventId, "Cancelled Projection Lab", 10));
+
+        EventInventory inventory = inventoryRepository.findById(eventId).orElseThrow();
+        assertEquals(3, inventory.getConfirmedCount());
+        assertEquals(EventStatus.CANCELLED, inventory.getEventStatus());
+    }
+
+    @Test
+    void publisherSendsRegistrationConfirmedMessageAndMarksItPublished() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID attendeeId = UUID.randomUUID();
+        inventoryRepository.saveAndFlush(inventory(eventId, 3, 0, EventStatus.PUBLISHED));
+
+        String registrationId = registerAndReadId(eventId, attendeeId, "rabbit-confirmed@example.com", "rabbit-confirmed");
+
+        int publishedCount = outboxPublisher.publishPending();
+
+        RegistrationOutboxMessage message = outboxRepository
+                .findByAggregateIdAndEventType(UUID.fromString(registrationId), "RegistrationConfirmed")
+                .orElseThrow();
+        assertTrue(publishedCount >= 1);
+        assertEquals(OutboxStatus.PUBLISHED, message.getStatus());
+        verify(rabbitTemplate, atLeastOnce()).convertAndSend(
+                eq("qeue.events"),
+                eq("registration.confirmed.v1"),
+                anyString(),
+                any(MessagePostProcessor.class)
+        );
+    }
+
     private boolean tryRegister(UUID eventId, UUID attendeeId, String email, String idempotencyKey) {
         try {
-            registrationService.register(eventId, attendeeId, email, new RegistrationRequestDTO(idempotencyKey));
+            registrationService.register(eventId, attendeeId, email, new RegistrationRequestDTO(idempotencyKey, null, List.of()));
             return true;
         } catch (ConflictException ex) {
             return false;
@@ -304,6 +406,20 @@ class RegistrationControllerIntegrationTests {
         return objectMapper.writeValueAsString(Map.of("idempotencyKey", idempotencyKey));
     }
 
+    private String eventMessage(String eventType, UUID eventId, String title, int capacity) throws Exception {
+        return objectMapper.writeValueAsString(Map.of(
+                "eventType", eventType,
+                "eventId", eventId,
+                "organizerId", UUID.randomUUID(),
+                "title", title,
+                "startsAt", Instant.now().plusSeconds(86400),
+                "venueName", "Test Hall",
+                "timezone", "UTC",
+                "capacity", capacity,
+                "status", eventType.equals("EventCancelled") ? "CANCELLED" : "PUBLISHED"
+        ));
+    }
+
     private String registerAndReadId(UUID eventId, UUID attendeeId, String email, String idempotencyKey) throws Exception {
         String response = mockMvc.perform(post("/api/events/{eventId}/registrations", eventId)
                         .headers(attendeeHeaders(attendeeId, email))
@@ -320,7 +436,10 @@ class RegistrationControllerIntegrationTests {
         EventInventory inventory = new EventInventory();
         inventory.setEventId(eventId);
         inventory.setTitle("Inventory " + eventId);
+        inventory.setOrganizerId(UUID.randomUUID());
         inventory.setStartsAt(Instant.now().plusSeconds(86400));
+        inventory.setVenueName("Test Hall");
+        inventory.setTimezone("UTC");
         inventory.setCapacity(capacity);
         inventory.setConfirmedCount(confirmedCount);
         inventory.setEventStatus(status);
@@ -332,7 +451,9 @@ class RegistrationControllerIntegrationTests {
         registration.setEventId(eventId);
         registration.setAttendeeId(attendeeId);
         registration.setAttendeeEmail(attendeeId + "@example.com");
+        registration.setAttendeeDisplayNameSnapshot(attendeeId + "@example.com");
         registration.setStatus(RegistrationStatus.CONFIRMED);
+        registration.setCheckInStatus(CheckInStatus.NOT_CHECKED_IN);
         registration.setIdempotencyKey(idempotencyKey);
         registration.setActiveRegistrationKey(RegistrationStatus.CONFIRMED.name());
         registration.setCreatedAt(Instant.now());

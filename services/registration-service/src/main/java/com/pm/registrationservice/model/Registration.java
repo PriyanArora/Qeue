@@ -21,9 +21,30 @@ public class Registration {
     @Column(nullable = false, length = 320)
     private String attendeeEmail;
 
+    @Column(nullable = false, length = 160)
+    private String attendeeDisplayNameSnapshot;
+
+    private UUID registrationTypeId;
+
+    @Column(length = 120)
+    private String registrationTypeNameSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private RegistrationStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private CheckInStatus checkInStatus;
+
+    private Instant checkedInAt;
+
+    private UUID checkedInByOrganizerId;
+
+    @Column(length = 128)
+    private String ticketCodeHash;
+
+    private Instant ticketCodeIssuedAt;
 
     @Column(nullable = false, length = 120)
     private String idempotencyKey;
@@ -68,12 +89,76 @@ public class Registration {
         this.attendeeEmail = attendeeEmail;
     }
 
+    public String getAttendeeDisplayNameSnapshot() {
+        return attendeeDisplayNameSnapshot;
+    }
+
+    public void setAttendeeDisplayNameSnapshot(String attendeeDisplayNameSnapshot) {
+        this.attendeeDisplayNameSnapshot = attendeeDisplayNameSnapshot;
+    }
+
+    public UUID getRegistrationTypeId() {
+        return registrationTypeId;
+    }
+
+    public void setRegistrationTypeId(UUID registrationTypeId) {
+        this.registrationTypeId = registrationTypeId;
+    }
+
+    public String getRegistrationTypeNameSnapshot() {
+        return registrationTypeNameSnapshot;
+    }
+
+    public void setRegistrationTypeNameSnapshot(String registrationTypeNameSnapshot) {
+        this.registrationTypeNameSnapshot = registrationTypeNameSnapshot;
+    }
+
     public RegistrationStatus getStatus() {
         return status;
     }
 
     public void setStatus(RegistrationStatus status) {
         this.status = status;
+    }
+
+    public CheckInStatus getCheckInStatus() {
+        return checkInStatus;
+    }
+
+    public void setCheckInStatus(CheckInStatus checkInStatus) {
+        this.checkInStatus = checkInStatus;
+    }
+
+    public Instant getCheckedInAt() {
+        return checkedInAt;
+    }
+
+    public void setCheckedInAt(Instant checkedInAt) {
+        this.checkedInAt = checkedInAt;
+    }
+
+    public UUID getCheckedInByOrganizerId() {
+        return checkedInByOrganizerId;
+    }
+
+    public void setCheckedInByOrganizerId(UUID checkedInByOrganizerId) {
+        this.checkedInByOrganizerId = checkedInByOrganizerId;
+    }
+
+    public String getTicketCodeHash() {
+        return ticketCodeHash;
+    }
+
+    public void setTicketCodeHash(String ticketCodeHash) {
+        this.ticketCodeHash = ticketCodeHash;
+    }
+
+    public Instant getTicketCodeIssuedAt() {
+        return ticketCodeIssuedAt;
+    }
+
+    public void setTicketCodeIssuedAt(Instant ticketCodeIssuedAt) {
+        this.ticketCodeIssuedAt = ticketCodeIssuedAt;
     }
 
     public String getIdempotencyKey() {

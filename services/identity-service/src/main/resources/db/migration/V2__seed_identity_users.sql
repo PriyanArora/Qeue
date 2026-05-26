@@ -10,7 +10,7 @@ INSERT INTO identity_users (
 ) VALUES
 (
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
-    'organizer@eventforge.local',
+    'organizer@qeue.local',
     '$2a$10$3moS5c/ObAzRLLRKabmLYu8kT0eac8KjXPlY7nusPn0DzHxDDUuve',
     'Local Organizer',
     'ORGANIZER',
@@ -19,7 +19,7 @@ INSERT INTO identity_users (
 ),
 (
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
-    'attendee@eventforge.local',
+    'attendee@qeue.local',
     '$2a$10$3YEaS8zKseMw3wZUhElcIOIhPxJH0Y/G0GOTkWfPGWkcqlgMCrUQC',
     'Local Attendee',
     'ATTENDEE',

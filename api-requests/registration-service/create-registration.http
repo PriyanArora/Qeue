@@ -7,5 +7,12 @@ Authorization: Bearer {{attendeeToken}}
 Content-Type: application/json
 
 {
-  "idempotencyKey": "manual-registration-001"
+  "idempotencyKey": "manual-registration-001",
+  "registrationTypeId": null,
+  "answers": [
+    {
+      "questionId": "22222222-2222-2222-2222-222222222222",
+      "answerText": "No accessibility needs."
+    }
+  ]
 }

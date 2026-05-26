@@ -1,0 +1,146 @@
+@baseUrl = http://localhost:8080
+@organizerToken = paste-organizer-access-token-from-login-response
+@attendeeToken = paste-attendee-access-token-from-login-response
+@eventId = paste-event-id
+@questionId = paste-question-id
+@typeId = paste-registration-type-id
+@speakerId = paste-speaker-id
+@sessionId = paste-session-id
+@surveyId = paste-survey-id
+@registrationId = paste-registration-id
+
+### Create registration question
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/registration-questions
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "questionText": "Do you need accessibility support?",
+  "questionType": "LONG_TEXT",
+  "required": false,
+  "sortOrder": 1,
+  "active": true
+}
+
+### Create registration type
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/registration-types
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "name": "General Admission",
+  "description": "Standard event access.",
+  "capacity": 100,
+  "active": true,
+  "sortOrder": 1
+}
+
+### Create speaker
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/speakers
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "name": "Rina Patel",
+  "title": "Principal Engineer",
+  "organization": "Qeue",
+  "bio": "Builds event systems.",
+  "photoUrl": "https://example.com/rina.jpg"
+}
+
+### Create session
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/sessions
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "title": "Opening Session",
+  "description": "Platform overview.",
+  "startsAt": "2026-09-01T14:15:00Z",
+  "endsAt": "2026-09-01T15:00:00Z",
+  "roomName": "Main Hall",
+  "capacity": 100,
+  "status": "PUBLISHED",
+  "speakerIds": ["{{speakerId}}"]
+}
+
+### Publish event
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/publish
+Authorization: Bearer {{organizerToken}}
+
+### Register with type and answers
+POST {{baseUrl}}/api/events/{{eventId}}/registrations
+Authorization: Bearer {{attendeeToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "workflow-registration-001",
+  "registrationTypeId": "{{typeId}}",
+  "answers": [
+    {
+      "questionId": "{{questionId}}",
+      "answerText": "No."
+    }
+  ]
+}
+
+### View attendee ticket
+GET {{baseUrl}}/api/me/registrations/{{registrationId}}/ticket
+Authorization: Bearer {{attendeeToken}}
+
+### List attendees
+GET {{baseUrl}}/api/organizer/events/{{eventId}}/registrations
+Authorization: Bearer {{organizerToken}}
+
+### Export attendees
+GET {{baseUrl}}/api/organizer/events/{{eventId}}/registrations/export.csv
+Authorization: Bearer {{organizerToken}}
+
+### Check in attendee
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/check-in
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "ticketCode": "paste-ticket-code"
+}
+
+### Analytics
+GET {{baseUrl}}/api/organizer/events/{{eventId}}/analytics
+Authorization: Bearer {{organizerToken}}
+
+### Create active survey
+POST {{baseUrl}}/api/organizer/events/{{eventId}}/surveys
+Authorization: Bearer {{organizerToken}}
+Content-Type: application/json
+
+{
+  "title": "Post-event feedback",
+  "status": "ACTIVE",
+  "questions": [
+    {
+      "questionText": "How was the event?",
+      "questionType": "RATING_1_TO_5",
+      "required": true,
+      "sortOrder": 1
+    }
+  ]
+}
+
+### Submit survey
+POST {{baseUrl}}/api/events/{{eventId}}/surveys/{{surveyId}}/responses
+Authorization: Bearer {{attendeeToken}}
+Content-Type: application/json
+
+{
+  "answers": [
+    {
+      "questionId": "{{questionId}}",
+      "ratingValue": 5
+    }
+  ]
+}
+
+### View survey responses
+GET {{baseUrl}}/api/organizer/events/{{eventId}}/surveys/{{surveyId}}/responses
+Authorization: Bearer {{organizerToken}}

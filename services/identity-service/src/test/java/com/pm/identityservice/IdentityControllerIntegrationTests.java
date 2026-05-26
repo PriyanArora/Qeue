@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "identity.jwt.secret=test-identity-secret-minimum-32-characters",
-        "identity.jwt.issuer=eventforge-identity",
+        "identity.jwt.issuer=qeue-identity",
         "identity.jwt.expiration-minutes=60"
 })
 @AutoConfigureMockMvc

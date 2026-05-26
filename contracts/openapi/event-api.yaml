@@ -1,48 +1,729 @@
 openapi: 3.1.0
 info:
-  title: EventForge Event API Draft
-  version: 0.1.0
-  description: Phase 2 route-name draft only; schemas and event lifecycle rules land in later phases.
+  title: Qeue Event API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
 paths:
   /api/events:
     get:
-      operationId: publicList
-      summary: public list
+      operationId: listPublishedEvents
+      security: []
       responses:
-        "501":
-          description: Not implemented until the event lifecycle phases.
+        "200":
+          description: Published events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventSummary"
   /api/events/{eventId}:
     get:
-      operationId: publicDetail
-      summary: public detail
+      operationId: getPublishedEvent
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
       responses:
-        "501":
-          description: Not implemented until the event lifecycle phases.
+        "200":
+          description: Published event.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/events/{eventId}/registration-questions:
+    get:
+      operationId: listPublicRegistrationQuestions
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/RegistrationQuestions"
+  /api/events/{eventId}/registration-types:
+    get:
+      operationId: listPublicRegistrationTypes
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/RegistrationTypes"
+  /api/events/{eventId}/speakers:
+    get:
+      operationId: listPublicSpeakers
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Speakers"
+  /api/events/{eventId}/sessions:
+    get:
+      operationId: listPublicSessions
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Sessions"
+  /api/events/{eventId}/surveys/active:
+    get:
+      operationId: getActiveSurvey
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Active survey.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Survey"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/organizer/events:
+    get:
+      operationId: listOrganizerEvents
+      responses:
+        "200":
+          description: Organizer events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     post:
-      operationId: organizerCreate
-      summary: organizer create
+      operationId: createEvent
+      requestBody:
+        $ref: "#/components/requestBodies/EventRequest"
       responses:
-        "501":
-          description: Not implemented until the event lifecycle phases.
+        "201":
+          $ref: "#/components/responses/EventDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/organizer/events/{eventId}:
-    put:
-      operationId: organizerUpdate
-      summary: organizer update
+    get:
+      operationId: getOrganizerEvent
+      parameters:
+        - $ref: "#/components/parameters/EventId"
       responses:
-        "501":
-          description: Not implemented until the event lifecycle phases.
+        "200":
+          $ref: "#/components/responses/EventDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateEvent
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/EventRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/EventDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/organizer/events/{eventId}/publish:
     post:
-      operationId: publish
-      summary: publish
+      operationId: publishEvent
+      parameters:
+        - $ref: "#/components/parameters/EventId"
       responses:
-        "501":
-          description: Not implemented until the event lifecycle phases.
+        "200":
+          $ref: "#/components/responses/EventDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/organizer/events/{eventId}/cancel:
     post:
-      operationId: cancel
-      summary: cancel
+      operationId: cancelEvent
+      parameters:
+        - $ref: "#/components/parameters/EventId"
       responses:
-        "501":
-          description: Not implemented until the event lifecycle phases.
+        "200":
+          $ref: "#/components/responses/EventDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/organizer/events/{eventId}/registration-questions:
+    get:
+      operationId: listOrganizerRegistrationQuestions
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/RegistrationQuestions"
+    post:
+      operationId: createRegistrationQuestion
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/RegistrationQuestionRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/RegistrationQuestion"
+  /api/organizer/events/{eventId}/registration-questions/{questionId}:
+    put:
+      operationId: updateRegistrationQuestion
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/QuestionId"
+      requestBody:
+        $ref: "#/components/requestBodies/RegistrationQuestionRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/RegistrationQuestion"
+    delete:
+      operationId: deactivateRegistrationQuestion
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/QuestionId"
+      responses:
+        "204":
+          description: Deactivated.
+  /api/organizer/events/{eventId}/registration-types:
+    get:
+      operationId: listOrganizerRegistrationTypes
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/RegistrationTypes"
+    post:
+      operationId: createRegistrationType
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/RegistrationTypeRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/RegistrationType"
+  /api/organizer/events/{eventId}/registration-types/{typeId}:
+    put:
+      operationId: updateRegistrationType
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/TypeId"
+      requestBody:
+        $ref: "#/components/requestBodies/RegistrationTypeRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/RegistrationType"
+    delete:
+      operationId: deactivateRegistrationType
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/TypeId"
+      responses:
+        "204":
+          description: Deactivated.
+  /api/organizer/events/{eventId}/speakers:
+    get:
+      operationId: listOrganizerSpeakers
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Speakers"
+    post:
+      operationId: createSpeaker
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/SpeakerRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Speaker"
+  /api/organizer/events/{eventId}/speakers/{speakerId}:
+    put:
+      operationId: updateSpeaker
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/SpeakerId"
+      requestBody:
+        $ref: "#/components/requestBodies/SpeakerRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Speaker"
+    delete:
+      operationId: deleteSpeaker
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/SpeakerId"
+      responses:
+        "204":
+          description: Deleted.
+  /api/organizer/events/{eventId}/sessions:
+    get:
+      operationId: listOrganizerSessions
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Sessions"
+    post:
+      operationId: createSession
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/SessionRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Session"
+  /api/organizer/events/{eventId}/sessions/{sessionId}:
+    put:
+      operationId: updateSession
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        $ref: "#/components/requestBodies/SessionRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Session"
+    delete:
+      operationId: deleteSession
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "204":
+          description: Deleted.
+  /api/organizer/events/{eventId}/surveys:
+    get:
+      operationId: listSurveys
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Surveys.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Survey"
+    post:
+      operationId: createSurvey
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        $ref: "#/components/requestBodies/SurveyRequest"
+      responses:
+        "201":
+          description: Survey.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Survey"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TypeId:
+      name: typeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SpeakerId:
+      name: speakerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBodies:
+    EventRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EventRequest"
+          examples:
+            inPerson:
+              value:
+                title: Qeue Launch
+                description: Local event platform launch.
+                eventFormat: IN_PERSON
+                category: Product
+                bannerImageUrl: https://example.com/banner.jpg
+                venueName: Community Hall
+                venueCity: Halifax
+                venueAddress: 1 Water Street
+                timezone: America/Halifax
+                startsAt: "2026-06-20T18:00:00Z"
+                endsAt: "2026-06-20T21:00:00Z"
+                capacity: 100
+    RegistrationQuestionRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RegistrationQuestionRequest"
+    RegistrationTypeRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RegistrationTypeRequest"
+    SpeakerRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SpeakerRequest"
+    SessionRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionRequest"
+    SurveyRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SurveyRequest"
+  responses:
+    EventDetail:
+      description: Event.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EventDetail"
+    RegistrationQuestion:
+      description: Registration question.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RegistrationQuestion"
+    RegistrationQuestions:
+      description: Registration questions.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/RegistrationQuestion"
+    RegistrationType:
+      description: Registration type.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RegistrationType"
+    RegistrationTypes:
+      description: Registration types.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/RegistrationType"
+    Speaker:
+      description: Speaker.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Speaker"
+    Speakers:
+      description: Speakers.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/Speaker"
+    Session:
+      description: Session.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Session"
+    Sessions:
+      description: Sessions.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/Session"
+    BadRequest:
+      description: Bad request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Forbidden.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    EventRequest:
+      type: object
+      required: [title, description, eventFormat, venueName, venueCity, timezone, startsAt, endsAt, capacity]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        eventFormat:
+          type: string
+          enum: [IN_PERSON, ONLINE, HYBRID]
+        category:
+          type: string
+        bannerImageUrl:
+          type: string
+          nullable: true
+        venueName:
+          type: string
+        venueCity:
+          type: string
+        venueAddress:
+          type: string
+        timezone:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        capacity:
+          type: integer
+          minimum: 1
+    EventSummary:
+      allOf:
+        - $ref: "#/components/schemas/EventRequest"
+        - type: object
+          required: [id, organizerId, status]
+          properties:
+            id:
+              type: string
+              format: uuid
+            organizerId:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [DRAFT, PUBLISHED, CANCELLED]
+    EventDetail:
+      allOf:
+        - $ref: "#/components/schemas/EventSummary"
+    RegistrationQuestionRequest:
+      type: object
+      required: [questionText, questionType, required, sortOrder, active]
+      properties:
+        questionText:
+          type: string
+        questionType:
+          type: string
+          enum: [TEXT, LONG_TEXT, YES_NO, RATING_1_TO_5]
+        required:
+          type: boolean
+        sortOrder:
+          type: integer
+        active:
+          type: boolean
+    RegistrationQuestion:
+      allOf:
+        - $ref: "#/components/schemas/RegistrationQuestionRequest"
+        - type: object
+          required: [id, eventId]
+          properties:
+            id:
+              type: string
+              format: uuid
+            eventId:
+              type: string
+              format: uuid
+    RegistrationTypeRequest:
+      type: object
+      required: [name, capacity, active, sortOrder]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+        active:
+          type: boolean
+        sortOrder:
+          type: integer
+    RegistrationType:
+      allOf:
+        - $ref: "#/components/schemas/RegistrationTypeRequest"
+        - type: object
+          required: [id, eventId]
+          properties:
+            id:
+              type: string
+              format: uuid
+            eventId:
+              type: string
+              format: uuid
+    SpeakerRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+        organization:
+          type: string
+        bio:
+          type: string
+        photoUrl:
+          type: string
+    Speaker:
+      allOf:
+        - $ref: "#/components/schemas/SpeakerRequest"
+        - type: object
+          required: [id, eventId]
+          properties:
+            id:
+              type: string
+              format: uuid
+            eventId:
+              type: string
+              format: uuid
+    SessionRequest:
+      type: object
+      required: [title, startsAt, endsAt, status]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        roomName:
+          type: string
+        capacity:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, CANCELLED]
+        speakerIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    Session:
+      allOf:
+        - $ref: "#/components/schemas/SessionRequest"
+        - type: object
+          required: [id, eventId, speakers]
+          properties:
+            id:
+              type: string
+              format: uuid
+            eventId:
+              type: string
+              format: uuid
+            speakers:
+              type: array
+              items:
+                $ref: "#/components/schemas/Speaker"
+    SurveyRequest:
+      type: object
+      required: [title, status, questions]
+      properties:
+        title:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, CLOSED]
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SurveyQuestionRequest"
+    SurveyQuestionRequest:
+      type: object
+      required: [questionText, questionType, required, sortOrder]
+      properties:
+        questionText:
+          type: string
+        questionType:
+          type: string
+          enum: [TEXT, LONG_TEXT, YES_NO, RATING_1_TO_5]
+        required:
+          type: boolean
+        sortOrder:
+          type: integer
+    Survey:
+      allOf:
+        - $ref: "#/components/schemas/SurveyRequest"
+        - type: object
+          required: [id, eventId]
+          properties:
+            id:
+              type: string
+              format: uuid
+            eventId:
+              type: string
+              format: uuid
+    ApiError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: string
