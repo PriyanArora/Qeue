@@ -22,11 +22,27 @@ public class Event {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 24)
+    private EventFormat eventFormat;
+
+    @Column(nullable = false, length = 80)
+    private String category;
+
+    @Column(length = 500)
+    private String bannerImageUrl;
+
     @Column(nullable = false, length = 160)
     private String venueName;
 
     @Column(nullable = false, length = 120)
     private String venueCity;
+
+    @Column(nullable = false, length = 240)
+    private String venueAddress;
+
+    @Column(nullable = false, length = 80)
+    private String timezone;
 
     @Column(nullable = false)
     private Instant startsAt;
@@ -79,6 +95,30 @@ public class Event {
         this.description = description;
     }
 
+    public EventFormat getEventFormat() {
+        return eventFormat;
+    }
+
+    public void setEventFormat(EventFormat eventFormat) {
+        this.eventFormat = eventFormat;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getBannerImageUrl() {
+        return bannerImageUrl;
+    }
+
+    public void setBannerImageUrl(String bannerImageUrl) {
+        this.bannerImageUrl = bannerImageUrl;
+    }
+
     public String getVenueName() {
         return venueName;
     }
@@ -93,6 +133,22 @@ public class Event {
 
     public void setVenueCity(String venueCity) {
         this.venueCity = venueCity;
+    }
+
+    public String getVenueAddress() {
+        return venueAddress;
+    }
+
+    public void setVenueAddress(String venueAddress) {
+        this.venueAddress = venueAddress;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 
     public Instant getStartsAt() {

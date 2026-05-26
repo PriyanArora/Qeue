@@ -2,11 +2,13 @@ package com.pm.eventservice.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,6 +42,15 @@ public class GlobalExceptionHandler {
         log.warn("Event not found {} ", ex.getMessage());
         Map<String, String> errors = new HashMap<>();
         errors.put("message", "Event not found");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errors);
+    }
+
+    @ExceptionHandler(DateTimeParseException.class)
+    public ResponseEntity<Map<String, String>> handleDateTimeParseException(DateTimeParseException ex) {
+
+        log.warn("Invalid event date {}", ex.getParsedString());
+        Map<String, String> errors = new HashMap<>();
+        errors.put("message", "Event date must use ISO format yyyy-MM-dd");
         return ResponseEntity.badRequest().body(errors);
     }
 }

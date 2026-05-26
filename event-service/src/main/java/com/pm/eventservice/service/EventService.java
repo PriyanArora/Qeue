@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @Service
 public class EventService {
-    private EventRepository eventRepository;
+    private final EventRepository eventRepository;
 
     public EventService(EventRepository eventRepository) {
         this.eventRepository = eventRepository;
@@ -55,6 +55,9 @@ public class EventService {
     }
 
     public void deleteEvent(UUID id) {
+        if (!eventRepository.existsById(id)) {
+            throw new EventNotFoundException("Event not found with ID " + id);
+        }
         eventRepository.deleteById(id);
     }
 }

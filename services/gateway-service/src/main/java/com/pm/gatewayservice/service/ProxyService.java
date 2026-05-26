@@ -69,9 +69,15 @@ public class ProxyService {
 
     private boolean isRegistrationPath(String path) {
         return path.matches("^/api/events/[^/]+/registrations.*")
+                || path.matches("^/api/events/[^/]+/surveys/[^/]+/responses.*")
+                || path.matches("^/api/organizer/events/[^/]+/registrations.*")
+                || path.matches("^/api/organizer/events/[^/]+/check-in.*")
+                || path.matches("^/api/organizer/events/[^/]+/analytics.*")
+                || path.matches("^/api/organizer/events/[^/]+/surveys/[^/]+/responses.*")
                 || path.startsWith("/api/registrations/")
                 || path.equals("/api/registrations")
-                || path.equals("/api/me/registrations");
+                || path.equals("/api/me/registrations")
+                || path.startsWith("/api/me/registrations/");
     }
 
     private HttpHeaders buildHeaders(HttpServletRequest request, GatewayPrincipal principal) {

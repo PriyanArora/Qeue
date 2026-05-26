@@ -28,7 +28,7 @@ public class GatewayController {
             "/api/events/**",
             "/api/organizer/events/**",
             "/api/registrations/**",
-            "/api/me/registrations"
+            "/api/me/registrations/**"
     })
     public ResponseEntity<byte[]> proxy(HttpServletRequest request,
                                         @AuthenticationPrincipal GatewayPrincipal principal) throws IOException {

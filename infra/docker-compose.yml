@@ -1,27 +1,27 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: eventforge-postgres
+    container_name: qeue-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-eventforge_admin}
-      POSTGRES_USER: ${POSTGRES_USER:-eventforge_admin}
+      POSTGRES_DB: ${POSTGRES_DB:-qeue_admin}
+      POSTGRES_USER: ${POSTGRES_USER:-qeue_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
-      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-eventforge_identity}
-      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-eventforge_identity_user}
+      IDENTITY_DB_NAME: ${IDENTITY_DB_NAME:-qeue_identity}
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-qeue_identity_user}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-change-me-local-only}
-      EVENT_DB_NAME: ${EVENT_DB_NAME:-eventforge_event}
-      EVENT_DB_USERNAME: ${EVENT_DB_USERNAME:-eventforge_event_user}
+      EVENT_DB_NAME: ${EVENT_DB_NAME:-qeue_event}
+      EVENT_DB_USERNAME: ${EVENT_DB_USERNAME:-qeue_event_user}
       EVENT_DB_PASSWORD: ${EVENT_DB_PASSWORD:-change-me-local-only}
-      REGISTRATION_DB_NAME: ${REGISTRATION_DB_NAME:-eventforge_registration}
-      REGISTRATION_DB_USERNAME: ${REGISTRATION_DB_USERNAME:-eventforge_registration_user}
+      REGISTRATION_DB_NAME: ${REGISTRATION_DB_NAME:-qeue_registration}
+      REGISTRATION_DB_USERNAME: ${REGISTRATION_DB_USERNAME:-qeue_registration_user}
       REGISTRATION_DB_PASSWORD: ${REGISTRATION_DB_PASSWORD:-change-me-local-only}
-      NOTIFICATION_DB_NAME: ${NOTIFICATION_DB_NAME:-eventforge_notification}
-      NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-eventforge_notification_user}
+      NOTIFICATION_DB_NAME: ${NOTIFICATION_DB_NAME:-qeue_notification}
+      NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-qeue_notification_user}
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-change-me-local-only}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - eventforge-postgres-data:/var/lib/postgresql/data
+      - qeue-postgres-data:/var/lib/postgresql/data
       - ./init/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -32,15 +32,15 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: eventforge-rabbitmq
+    container_name: qeue-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-eventforge_local}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-qeue_local}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change-me-local-only}
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
     volumes:
-      - eventforge-rabbitmq-data:/var/lib/rabbitmq
+      - qeue-rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -50,7 +50,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
-    container_name: eventforge-mailhog
+    container_name: qeue-mailhog
     ports:
       - "${MAILHOG_PORT:-1025}:1025"
       - "${MAILHOG_UI_PORT:-8025}:8025"
@@ -61,6 +61,130 @@ services:
       retries: 10
       start_period: 5s
 
+  identity-service:
+    build:
+      context: ../services/identity-service
+    container_name: qeue-identity-service
+    environment:
+      IDENTITY_SERVICE_PORT: 4001
+      IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/${IDENTITY_DB_NAME:-qeue_identity}
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-qeue_identity_user}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-change-me-local-only}
+      IDENTITY_JWT_SECRET: ${IDENTITY_JWT_SECRET:-local-dev-secret-at-least-32-bytes-long}
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-qeue-identity}
+    ports:
+      - "${IDENTITY_SERVICE_PORT:-4001}:4001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  event-service:
+    build:
+      context: ../services/event-service
+    container_name: qeue-event-service
+    environment:
+      EVENT_SERVICE_PORT: 4000
+      EVENT_DB_URL: jdbc:postgresql://postgres:5432/${EVENT_DB_NAME:-qeue_event}
+      EVENT_DB_USERNAME: ${EVENT_DB_USERNAME:-qeue_event_user}
+      EVENT_DB_PASSWORD: ${EVENT_DB_PASSWORD:-change-me-local-only}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-qeue_local}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me-local-only}
+      EVENT_OUTBOX_PUBLISHER_ENABLED: "true"
+    ports:
+      - "${EVENT_SERVICE_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  registration-service:
+    build:
+      context: ../services/registration-service
+    container_name: qeue-registration-service
+    environment:
+      REGISTRATION_SERVICE_PORT: 4002
+      REGISTRATION_GRPC_PORT: 9001
+      REGISTRATION_DB_URL: jdbc:postgresql://postgres:5432/${REGISTRATION_DB_NAME:-qeue_registration}
+      REGISTRATION_DB_USERNAME: ${REGISTRATION_DB_USERNAME:-qeue_registration_user}
+      REGISTRATION_DB_PASSWORD: ${REGISTRATION_DB_PASSWORD:-change-me-local-only}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-qeue_local}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me-local-only}
+      RABBITMQ_LISTENER_ENABLED: "true"
+      REGISTRATION_OUTBOX_PUBLISHER_ENABLED: "true"
+    ports:
+      - "${REGISTRATION_SERVICE_PORT:-4002}:4002"
+      - "${REGISTRATION_GRPC_PORT:-9001}:9001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-worker:
+    build:
+      context: ../services/notification-worker
+    container_name: qeue-notification-worker
+    environment:
+      NOTIFICATION_WORKER_PORT: 4003
+      NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/${NOTIFICATION_DB_NAME:-qeue_notification}
+      NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-qeue_notification_user}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-change-me-local-only}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-qeue_local}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-change-me-local-only}
+      RABBITMQ_LISTENER_ENABLED: "true"
+      MAILHOG_ENABLED: "true"
+      MAILHOG_HOST: mailhog
+      MAILHOG_PORT: 1025
+    ports:
+      - "${NOTIFICATION_WORKER_PORT:-4003}:4003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_healthy
+
+  gateway-service:
+    build:
+      context: ../services/gateway-service
+    container_name: qeue-gateway-service
+    environment:
+      GATEWAY_PORT: 8080
+      IDENTITY_SERVICE_URL: http://identity-service:4001
+      EVENT_SERVICE_URL: http://event-service:4000
+      REGISTRATION_SERVICE_URL: http://registration-service:4002
+      IDENTITY_JWT_SECRET: ${IDENTITY_JWT_SECRET:-local-dev-secret-at-least-32-bytes-long}
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-qeue-identity}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+      registration-service:
+        condition: service_healthy
+
+  web-client:
+    build:
+      context: ../web-client
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: qeue-web-client
+    ports:
+      - "${WEB_CLIENT_PORT:-3000}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+
 volumes:
-  eventforge-postgres-data:
-  eventforge-rabbitmq-data:
+  qeue-postgres-data:
+  qeue-rabbitmq-data:

@@ -1,19 +1,32 @@
 package com.pm.eventservice;
 
+import com.pm.eventservice.messaging.EventOutboxPublisher;
+import com.pm.eventservice.model.EventOutboxMessage;
+import com.pm.eventservice.model.OutboxStatus;
+import com.pm.eventservice.repository.EventOutboxRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -27,6 +40,15 @@ class EventControllerIntegrationTests {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private EventOutboxRepository outboxRepository;
+
+    @Autowired
+    private EventOutboxPublisher outboxPublisher;
+
+    @Autowired
+    private RecordingRabbitTemplate rabbitTemplate;
 
     @Test
     void createsValidDraftEvent() throws Exception {
@@ -68,17 +90,42 @@ class EventControllerIntegrationTests {
         mockMvc.perform(post("/api/organizer/events")
                         .headers(organizerHeaders())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "title", "Invalid Time Event",
-                                "description", "This event has an invalid time range.",
-                                "venueName", "Test Hall",
-                                "venueCity", "Springfield",
-                                "startsAt", startsAt,
-                                "endsAt", endsAt,
-                                "capacity", 10
+                        .content(objectMapper.writeValueAsString(Map.ofEntries(
+                                Map.entry("title", "Invalid Time Event"),
+                                Map.entry("description", "This event has an invalid time range."),
+                                Map.entry("eventFormat", "IN_PERSON"),
+                                Map.entry("category", "Testing"),
+                                Map.entry("bannerImageUrl", ""),
+                                Map.entry("venueName", "Test Hall"),
+                                Map.entry("venueCity", "Springfield"),
+                                Map.entry("venueAddress", "1 Test Way"),
+                                Map.entry("timezone", "UTC"),
+                                Map.entry("startsAt", startsAt),
+                                Map.entry("endsAt", endsAt),
+                                Map.entry("capacity", 10)
                         ))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("End time must be after start time"));
+    }
+
+    @Test
+    void organizerCanReadOwnDraftEvent() throws Exception {
+        String title = "Organizer Draft Detail " + UUID.randomUUID();
+        String response = mockMvc.perform(post("/api/organizer/events")
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(eventRequest(title, 30)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String eventId = objectMapper.readTree(response).get("id").asText();
+
+        mockMvc.perform(get("/api/organizer/events/{eventId}", eventId)
+                        .headers(organizerHeaders()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(title))
+                .andExpect(jsonPath("$.status").value("DRAFT"));
     }
 
     @Test
@@ -122,6 +169,33 @@ class EventControllerIntegrationTests {
                 .andExpect(jsonPath("$[*].eventType", hasItem("EventCancelled")));
     }
 
+    @Test
+    void publisherSendsPendingOutboxMessageAndMarksItPublished() throws Exception {
+        String title = "Rabbit Publish Flow " + UUID.randomUUID();
+        String response = mockMvc.perform(post("/api/organizer/events")
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(eventRequest(title, 30)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        UUID eventId = UUID.fromString(objectMapper.readTree(response).get("id").asText());
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/publish", eventId)
+                        .headers(organizerHeaders()))
+                .andExpect(status().isOk());
+
+        int publishedCount = outboxPublisher.publishPending();
+
+        EventOutboxMessage outboxMessage = outboxRepository
+                .findByAggregateIdAndEventType(eventId, "EventPublished")
+                .orElseThrow();
+        assertEquals(OutboxStatus.PUBLISHED, outboxMessage.getStatus());
+        assertTrue(publishedCount >= 1);
+        assertTrue(rabbitTemplate.wasPublished("qeue.events", "event.published.v1"));
+    }
+
     private org.springframework.http.HttpHeaders organizerHeaders() {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.add("X-User-Id", ORGANIZER_ID.toString());
@@ -130,14 +204,55 @@ class EventControllerIntegrationTests {
     }
 
     private String eventRequest(String title, int capacity) throws Exception {
-        return objectMapper.writeValueAsString(Map.of(
-                "title", title,
-                "description", "A useful event for integration testing.",
-                "venueName", "Test Hall",
-                "venueCity", "Springfield",
-                "startsAt", Instant.now().plusSeconds(86400),
-                "endsAt", Instant.now().plusSeconds(90000),
-                "capacity", capacity
+        return objectMapper.writeValueAsString(Map.ofEntries(
+                Map.entry("title", title),
+                Map.entry("description", "A useful event for integration testing."),
+                Map.entry("eventFormat", "IN_PERSON"),
+                Map.entry("category", "Testing"),
+                Map.entry("bannerImageUrl", ""),
+                Map.entry("venueName", "Test Hall"),
+                Map.entry("venueCity", "Springfield"),
+                Map.entry("venueAddress", "1 Test Way"),
+                Map.entry("timezone", "UTC"),
+                Map.entry("startsAt", Instant.now().plusSeconds(86400)),
+                Map.entry("endsAt", Instant.now().plusSeconds(90000)),
+                Map.entry("capacity", capacity)
         ));
+    }
+
+    @TestConfiguration
+    static class RabbitTestConfig {
+        @Bean
+        @Primary
+        RecordingRabbitTemplate rabbitTemplate() {
+            return new RecordingRabbitTemplate();
+        }
+    }
+
+    static class RecordingRabbitTemplate extends RabbitTemplate {
+        private final List<PublishedMessage> publishedMessages = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void afterPropertiesSet() {
+        }
+
+        @Override
+        public void convertAndSend(
+                String exchange,
+                String routingKey,
+                Object message,
+                MessagePostProcessor messagePostProcessor
+        ) {
+            publishedMessages.add(new PublishedMessage(exchange, routingKey, message));
+        }
+
+        boolean wasPublished(String exchange, String routingKey) {
+            return publishedMessages.stream()
+                    .anyMatch(message -> message.exchange().equals(exchange)
+                            && message.routingKey().equals(routingKey));
+        }
+    }
+
+    record PublishedMessage(String exchange, String routingKey, Object message) {
     }
 }

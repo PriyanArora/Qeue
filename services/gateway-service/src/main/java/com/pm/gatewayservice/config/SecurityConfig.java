@@ -34,8 +34,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/internal/health").permitAll()
                         .requestMatchers("/api/events/*/registrations").hasRole("ATTENDEE")
+                        .requestMatchers("/api/events/*/surveys/*/responses").hasRole("ATTENDEE")
                         .requestMatchers("/api/registrations/**").hasRole("ATTENDEE")
                         .requestMatchers("/api/me/registrations").hasRole("ATTENDEE")
+                        .requestMatchers("/api/me/registrations/**").hasRole("ATTENDEE")
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers("/api/organizer/events/**").hasRole("ORGANIZER")

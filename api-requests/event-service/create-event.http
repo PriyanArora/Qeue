@@ -10,8 +10,13 @@ Content-Type: application/json
 {
   "title": "Springfield Java Meetup",
   "description": "A practical meetup for Java web application builders.",
+  "eventFormat": "IN_PERSON",
+  "category": "Engineering",
+  "bannerImageUrl": "https://example.com/qeue-banner.jpg",
   "venueName": "Springfield Community Hall",
   "venueCity": "Springfield",
+  "venueAddress": "100 Main Street",
+  "timezone": "America/Halifax",
   "startsAt": "2026-08-15T14:00:00Z",
   "endsAt": "2026-08-15T17:00:00Z",
   "capacity": 80

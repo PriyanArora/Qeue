@@ -1,27 +1,495 @@
 openapi: 3.1.0
 info:
-  title: EventForge Registration API Draft
-  version: 0.1.0
-  description: Phase 2 route-name draft only; schemas and capacity rules land in later phases.
+  title: Qeue Registration API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
 paths:
   /api/events/{eventId}/registrations:
     post:
-      operationId: reserveSeat
-      summary: reserve seat
+      operationId: registerForEvent
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationRequest"
+            examples:
+              withAnswers:
+                value:
+                  idempotencyKey: browser-submit-123
+                  registrationTypeId: 11111111-1111-1111-1111-111111111111
+                  answers:
+                    - questionId: 22222222-2222-2222-2222-222222222222
+                      answerText: Front row if available
       responses:
-        "501":
-          description: Not implemented until the registration phases.
+        "201":
+          $ref: "#/components/responses/Registration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/registrations/{registrationId}:
     delete:
-      operationId: cancelReservation
-      summary: cancel reservation
+      operationId: cancelRegistration
+      parameters:
+        - $ref: "#/components/parameters/RegistrationId"
       responses:
-        "501":
-          description: Not implemented until the registration phases.
+        "200":
+          $ref: "#/components/responses/Registration"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/me/registrations:
     get:
       operationId: listMyRegistrations
-      summary: list my registrations
       responses:
-        "501":
-          description: Not implemented until the registration phases.
+        "200":
+          description: Current attendee registrations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Registration"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/me/registrations/{registrationId}/ticket:
+    get:
+      operationId: issueTicket
+      parameters:
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "200":
+          description: Fresh ticket code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/organizer/events/{eventId}/registrations:
+    get:
+      operationId: listOrganizerRegistrations
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [CONFIRMED, CANCELLED]
+        - name: registrationTypeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: query
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Organizer attendee list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrganizerRegistration"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/organizer/events/{eventId}/registrations/{registrationId}:
+    get:
+      operationId: getOrganizerRegistration
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "200":
+          description: Organizer registration detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerRegistration"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/organizer/events/{eventId}/registrations/export.csv:
+    get:
+      operationId: exportOrganizerRegistrations
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Registration CSV export.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/organizer/events/{eventId}/check-in:
+    post:
+      operationId: checkIn
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInRequest"
+            examples:
+              ticket:
+                value:
+                  ticketCode: ABCD-1234
+      responses:
+        "200":
+          description: Check-in result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckInResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/organizer/events/{eventId}/analytics:
+    get:
+      operationId: eventAnalytics
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Event analytics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analytics"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/events/{eventId}/surveys/{surveyId}/responses:
+    post:
+      operationId: submitSurvey
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/SurveyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SurveySubmissionRequest"
+      responses:
+        "201":
+          description: Survey submission.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SurveySubmission"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/organizer/events/{eventId}/surveys/{surveyId}/responses:
+    get:
+      operationId: listSurveyResponses
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/SurveyId"
+      responses:
+        "200":
+          description: Survey responses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SurveySubmission"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RegistrationId:
+      name: registrationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SurveyId:
+      name: surveyId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Registration:
+      description: Registration.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Registration"
+    BadRequest:
+      description: Bad request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Forbidden.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: Conflict.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    RegistrationRequest:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey:
+          type: string
+        registrationTypeId:
+          type: string
+          format: uuid
+          nullable: true
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistrationAnswer"
+    RegistrationAnswer:
+      type: object
+      required: [questionId, answerText]
+      properties:
+        questionId:
+          type: string
+          format: uuid
+        answerText:
+          type: string
+    Registration:
+      type: object
+      required: [registrationId, eventId, attendeeId, attendeeEmail, status, checkInStatus, createdAt, answers]
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        attendeeId:
+          type: string
+          format: uuid
+        attendeeEmail:
+          type: string
+          format: email
+        attendeeDisplayName:
+          type: string
+        registrationTypeId:
+          type: string
+          format: uuid
+          nullable: true
+        registrationTypeName:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [CONFIRMED, CANCELLED]
+        checkInStatus:
+          type: string
+          enum: [NOT_CHECKED_IN, CHECKED_IN]
+        createdAt:
+          type: string
+          format: date-time
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        checkedInAt:
+          type: string
+          format: date-time
+          nullable: true
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistrationAnswer"
+    OrganizerRegistration:
+      allOf:
+        - $ref: "#/components/schemas/Registration"
+    Ticket:
+      type: object
+      required: [registrationId, eventId, ticketCode, issuedAt]
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        ticketCode:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+    CheckInRequest:
+      type: object
+      required: [ticketCode]
+      properties:
+        ticketCode:
+          type: string
+    CheckInResponse:
+      type: object
+      required: [registrationId, status, checkInStatus]
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        attendeeEmail:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [CONFIRMED, CANCELLED]
+        checkInStatus:
+          type: string
+          enum: [NOT_CHECKED_IN, CHECKED_IN]
+        checkedInAt:
+          type: string
+          format: date-time
+          nullable: true
+        message:
+          type: string
+    Analytics:
+      type: object
+      required: [eventId, capacity, confirmedCount, cancelledCount, availableSeats, checkedInCount, noShowCount, registrationTypes]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        capacity:
+          type: integer
+        confirmedCount:
+          type: integer
+        cancelledCount:
+          type: integer
+        availableSeats:
+          type: integer
+        checkedInCount:
+          type: integer
+        noShowCount:
+          type: integer
+        registrationTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistrationTypeBreakdown"
+    RegistrationTypeBreakdown:
+      type: object
+      required: [registrationTypeId, name, capacity, confirmedCount, availableSeats]
+      properties:
+        registrationTypeId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        capacity:
+          type: integer
+        confirmedCount:
+          type: integer
+        availableSeats:
+          type: integer
+    SurveySubmissionRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SurveyAnswer"
+    SurveyAnswer:
+      type: object
+      required: [questionId]
+      properties:
+        questionId:
+          type: string
+          format: uuid
+        answerText:
+          type: string
+          nullable: true
+        ratingValue:
+          type: integer
+          nullable: true
+    SurveySubmission:
+      type: object
+      required: [submissionId, surveyId, eventId, attendeeId, submittedAt, answers]
+      properties:
+        submissionId:
+          type: string
+          format: uuid
+        surveyId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        attendeeId:
+          type: string
+          format: uuid
+        submittedAt:
+          type: string
+          format: date-time
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SurveyAnswer"
+    ApiError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: string
