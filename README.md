@@ -1,4 +1,5 @@
 # Qeue
+This project was originally a patient management system built by following a YouTube tutorial video by Chris Blakely, which was later abandoned and pivoted into a full-scale event management platform. The commit history starts fresh from that pivot point, with the original tutorial work serving only as the initial structural reference.
 
 Qeue is a learning portfolio project for building a small Java event-management platform. The target system is a microservice web platform where organizers publish events and attendees reserve seats without overselling capacity.
 
