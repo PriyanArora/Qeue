@@ -1,12 +1,12 @@
 # Qeue
 
-Qeue is a Java/Spring event-management platform for organizers and attendees. It is a learning portfolio project that started from an abandoned patient-management tutorial structure and was pivoted into a Cvent-inspired event platform.
+Qeue is a Java/Spring event-management platform for organizers and attendees. It is a learning portfolio project that started from an abandoned patient-management tutorial structure and was pivoted into a event platform.
 
 The current product goal is simple: organizers can build and publish events, attendees can register without overselling capacity, and organizers can run basic event operations such as attendee management, check-in, analytics, notifications, and surveys.
 
 ## Current Feature Scope
 
-The active implementation covers the Cvent-inspired event-platform scope:
+The active implementation covers the event-platform scope:
 
 - Event builder fields: format, category, banner image, venue, timezone, start/end time, capacity, draft/publish/cancel lifecycle.
 - Registration questions and stored attendee answers.
