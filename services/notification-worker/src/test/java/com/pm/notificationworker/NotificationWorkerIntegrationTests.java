@@ -48,6 +48,8 @@ class NotificationWorkerIntegrationTests {
                 .orElseThrow();
         assertEquals(NotificationStatus.SKIPPED, log.getStatus());
         assertEquals("attendee@example.com", log.getRecipientEmail());
+        assertEquals("Registration confirmed: Springfield Java Meetup", log.getRenderedSubject());
+        assertTrue(log.getRenderedBody().contains("Your registration for Springfield Java Meetup is confirmed."));
     }
 
     @Test
@@ -60,6 +62,20 @@ class NotificationWorkerIntegrationTests {
                 .findByRegistrationIdAndNotificationType(registrationId, NotificationType.REGISTRATION_CANCELLED)
                 .orElseThrow();
         assertEquals(NotificationStatus.SKIPPED, log.getStatus());
+        assertEquals("Registration cancelled: Springfield Java Meetup", log.getRenderedSubject());
+    }
+
+    @Test
+    void recordsCheckInConfirmationNotification() throws Exception {
+        UUID registrationId = UUID.randomUUID();
+
+        consumer.consumeRegistrationMessage(registrationMessage("CheckInCompleted", registrationId));
+
+        var log = notificationLogRepository
+                .findByRegistrationIdAndNotificationType(registrationId, NotificationType.CHECK_IN_CONFIRMATION)
+                .orElseThrow();
+        assertEquals(NotificationStatus.SKIPPED, log.getStatus());
+        assertEquals("Checked in: Springfield Java Meetup", log.getRenderedSubject());
     }
 
     @Test

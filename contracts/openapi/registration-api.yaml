@@ -96,6 +96,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [createdAtAsc, createdAtDesc, emailAsc, emailDesc, statusAsc, statusDesc]
       responses:
         "200":
           description: Organizer attendee list.
@@ -309,7 +314,7 @@ components:
           type: string
     Registration:
       type: object
-      required: [registrationId, eventId, attendeeId, attendeeEmail, status, checkInStatus, createdAt, answers]
+      required: [registrationId, eventId, eventTitle, startsAt, attendeeId, attendeeEmail, attendeeDisplayNameSnapshot, status, checkInStatus, createdAt, answers]
       properties:
         registrationId:
           type: string
@@ -317,19 +322,24 @@ components:
         eventId:
           type: string
           format: uuid
+        eventTitle:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
         attendeeId:
           type: string
           format: uuid
         attendeeEmail:
           type: string
           format: email
-        attendeeDisplayName:
+        attendeeDisplayNameSnapshot:
           type: string
         registrationTypeId:
           type: string
           format: uuid
           nullable: true
-        registrationTypeName:
+        registrationTypeNameSnapshot:
           type: string
           nullable: true
         status:
@@ -379,63 +389,47 @@ components:
           type: string
     CheckInResponse:
       type: object
-      required: [registrationId, status, checkInStatus]
+      required: [status, registrationId, attendeeEmail, checkedInAt]
       properties:
+        status:
+          type: string
+          enum: [NOT_CHECKED_IN, CHECKED_IN]
         registrationId:
           type: string
           format: uuid
         attendeeEmail:
           type: string
           format: email
-        status:
-          type: string
-          enum: [CONFIRMED, CANCELLED]
-        checkInStatus:
-          type: string
-          enum: [NOT_CHECKED_IN, CHECKED_IN]
         checkedInAt:
           type: string
           format: date-time
-          nullable: true
-        message:
-          type: string
     Analytics:
       type: object
-      required: [eventId, capacity, confirmedCount, cancelledCount, availableSeats, checkedInCount, noShowCount, registrationTypes]
+      required: [capacity, confirmedRegistrations, cancelledRegistrations, availableSeats, checkIns, noShows, registrationTypeBreakdown]
       properties:
-        eventId:
-          type: string
-          format: uuid
         capacity:
           type: integer
-        confirmedCount:
+        confirmedRegistrations:
           type: integer
-        cancelledCount:
+        cancelledRegistrations:
           type: integer
         availableSeats:
           type: integer
-        checkedInCount:
+        checkIns:
           type: integer
-        noShowCount:
+        noShows:
           type: integer
-        registrationTypes:
+        registrationTypeBreakdown:
           type: array
           items:
             $ref: "#/components/schemas/RegistrationTypeBreakdown"
     RegistrationTypeBreakdown:
       type: object
-      required: [registrationTypeId, name, capacity, confirmedCount, availableSeats]
+      required: [registrationTypeName, confirmedCount]
       properties:
-        registrationTypeId:
+        registrationTypeName:
           type: string
-          format: uuid
-        name:
-          type: string
-        capacity:
-          type: integer
         confirmedCount:
-          type: integer
-        availableSeats:
           type: integer
     SurveySubmissionRequest:
       type: object

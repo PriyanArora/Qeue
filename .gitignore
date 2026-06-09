@@ -2,8 +2,8 @@
 .env.*
 !.env.example
 
-.codex/
-codex-folder/
+.agents/
+.claude/
 
 target/
 build/
@@ -14,7 +14,6 @@ out/
 
 .idea/
 *.iml
-!qeue.iml
 *.iws
 *.ipr
 .vscode/
