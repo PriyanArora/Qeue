@@ -6,7 +6,7 @@ The current product goal is simple: organizers can build and publish events, att
 
 ## Current Feature Scope
 
-The active implementation covers the Cvent-inspired event-platform scope:
+The active implementation covers the event-platform scope:
 
 - Event builder fields: format, category, banner image, venue, timezone, start/end time, capacity, draft/publish/cancel lifecycle.
 - Registration questions and stored attendee answers.
