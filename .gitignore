@@ -14,7 +14,6 @@ out/
 
 .idea/
 *.iml
-!qeue.iml
 *.iws
 *.ipr
 .vscode/
