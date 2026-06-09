@@ -39,8 +39,8 @@ public class EventInventoryConsumer {
         validateMessage(message);
 
         switch (message.eventType()) {
-            case "EventPublished" -> upsertPublishedInventory(message);
-            case "EventCancelled" -> cancelInventory(message);
+            case "EventPublished" -> handlePublished(message);
+            case "EventCancelled" -> handleCancelled(message);
             default -> throw new IllegalArgumentException("Unsupported event inventory message type " + message.eventType());
         }
     }
@@ -71,47 +71,37 @@ public class EventInventoryConsumer {
         }
     }
 
-    private void upsertPublishedInventory(EventInventoryMessage message) {
-        EventInventory inventory = inventoryRepository.findById(message.eventId())
-                .orElseGet(EventInventory::new);
-        boolean newInventory = inventory.getEventId() == null;
-
-        inventory.setEventId(message.eventId());
-        inventory.setOrganizerId(message.organizerId());
-        inventory.setTitle(message.title());
-        inventory.setStartsAt(message.startsAt());
-        inventory.setVenueName(message.venueName());
-        inventory.setTimezone(message.timezone());
-        inventory.setCapacity(message.capacity());
-        inventory.setConfirmedCount(newInventory ? 0 : inventory.getConfirmedCount());
-        inventory.setEventStatus(EventStatus.PUBLISHED);
-
-        inventoryRepository.save(inventory);
+    private void handlePublished(EventInventoryMessage message) {
+        projectInventory(message, EventStatus.PUBLISHED);
         upsertRegistrationTypes(message);
         log.info("Projected event inventory action=event_published eventId={}", message.eventId());
     }
 
-    private void cancelInventory(EventInventoryMessage message) {
-        EventInventory inventory = inventoryRepository.findById(message.eventId())
-                .orElseGet(EventInventory::new);
-        boolean newInventory = inventory.getEventId() == null;
-
-        inventory.setEventId(message.eventId());
-        inventory.setOrganizerId(message.organizerId());
-        inventory.setTitle(message.title());
-        inventory.setStartsAt(message.startsAt());
-        inventory.setVenueName(message.venueName());
-        inventory.setTimezone(message.timezone());
-        inventory.setCapacity(message.capacity());
-        inventory.setConfirmedCount(newInventory ? 0 : inventory.getConfirmedCount());
-        inventory.setEventStatus(EventStatus.CANCELLED);
-
-        inventoryRepository.save(inventory);
+    private void handleCancelled(EventInventoryMessage message) {
+        projectInventory(message, EventStatus.CANCELLED);
         for (RegistrationTypeInventory typeInventory : typeInventoryRepository.findByEventId(message.eventId())) {
             typeInventory.setActive(false);
             typeInventoryRepository.save(typeInventory);
         }
         log.info("Projected event inventory action=event_cancelled eventId={}", message.eventId());
+    }
+
+    private void projectInventory(EventInventoryMessage message, EventStatus status) {
+        EventInventory inventory = inventoryRepository.findById(message.eventId())
+                .orElseGet(EventInventory::new);
+        boolean newInventory = inventory.getEventId() == null;
+
+        inventory.setEventId(message.eventId());
+        inventory.setOrganizerId(message.organizerId());
+        inventory.setTitle(message.title());
+        inventory.setStartsAt(message.startsAt());
+        inventory.setVenueName(message.venueName());
+        inventory.setTimezone(message.timezone());
+        inventory.setCapacity(message.capacity());
+        inventory.setConfirmedCount(newInventory ? 0 : inventory.getConfirmedCount());
+        inventory.setEventStatus(status);
+
+        inventoryRepository.save(inventory);
     }
 
     private void upsertRegistrationTypes(EventInventoryMessage message) {

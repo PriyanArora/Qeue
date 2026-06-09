@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -140,7 +141,8 @@ public class RegistrationService {
                                                                              UUID eventId,
                                                                              RegistrationStatus status,
                                                                              UUID registrationTypeId,
-                                                                             String query) {
+                                                                             String query,
+                                                                             String sort) {
         EventInventory inventory = findOrganizerInventory(organizerId, eventId);
         String normalizedQuery = query == null ? "" : query.toLowerCase(Locale.ROOT);
         return registrationRepository.findByEventIdOrderByCreatedAtDesc(eventId)
@@ -150,6 +152,7 @@ public class RegistrationService {
                 .filter(registration -> normalizedQuery.isBlank()
                         || registration.getAttendeeEmail().toLowerCase(Locale.ROOT).contains(normalizedQuery)
                         || registration.getAttendeeDisplayNameSnapshot().toLowerCase(Locale.ROOT).contains(normalizedQuery))
+                .sorted(organizerRegistrationComparator(sort))
                 .map(registration -> toOrganizerResponse(registration, inventory))
                 .toList();
     }
@@ -318,31 +321,25 @@ public class RegistrationService {
     }
 
     private void validateAnswers(List<RegistrationAnswerDTO> answers) {
-        if (answers == null) {
-            return;
-        }
-        Set<UUID> questionIds = new HashSet<>();
-        for (RegistrationAnswerDTO answer : answers) {
-            if (answer.questionId() == null) {
-                throw new BadRequestException("Question id is required");
-            }
-            if (!questionIds.add(answer.questionId())) {
-                throw new BadRequestException("Duplicate answer question id");
-            }
-        }
+        requireUniqueQuestionIds(answers, RegistrationAnswerDTO::questionId, "answer");
     }
 
     private void validateSurveyAnswers(List<SurveyAnswerDTO> answers) {
+        requireUniqueQuestionIds(answers, SurveyAnswerDTO::questionId, "survey");
+    }
+
+    private <T> void requireUniqueQuestionIds(List<T> answers, Function<T, UUID> questionId, String label) {
         if (answers == null) {
             return;
         }
-        Set<UUID> questionIds = new HashSet<>();
-        for (SurveyAnswerDTO answer : answers) {
-            if (answer.questionId() == null) {
+        Set<UUID> seen = new HashSet<>();
+        for (T answer : answers) {
+            UUID id = questionId.apply(answer);
+            if (id == null) {
                 throw new BadRequestException("Question id is required");
             }
-            if (!questionIds.add(answer.questionId())) {
-                throw new BadRequestException("Duplicate survey question id");
+            if (!seen.add(id)) {
+                throw new BadRequestException("Duplicate " + label + " question id");
             }
         }
     }
@@ -494,5 +491,22 @@ public class RegistrationService {
     private String csv(Object value) {
         String text = value == null ? "" : value.toString();
         return "\"" + text.replace("\"", "\"\"").replace("\r", " ").replace("\n", " ") + "\"";
+    }
+
+    private Comparator<Registration> organizerRegistrationComparator(String sort) {
+        String normalizedSort = sort == null || sort.isBlank() ? "createdAtDesc" : sort;
+        Comparator<Registration> emailComparator = Comparator.comparing(
+                Registration::getAttendeeEmail,
+                String.CASE_INSENSITIVE_ORDER
+        );
+        return switch (normalizedSort) {
+            case "createdAtAsc" -> Comparator.comparing(Registration::getCreatedAt);
+            case "createdAtDesc" -> Comparator.comparing(Registration::getCreatedAt).reversed();
+            case "emailAsc" -> emailComparator;
+            case "emailDesc" -> emailComparator.reversed();
+            case "statusAsc" -> Comparator.comparing(registration -> registration.getStatus().name());
+            case "statusDesc" -> Comparator.comparing((Registration registration) -> registration.getStatus().name()).reversed();
+            default -> throw new BadRequestException("Registration sort is invalid");
+        };
     }
 }

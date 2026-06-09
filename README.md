@@ -1,191 +1,230 @@
 # Qeue
-This project was originally a patient management system built by following a YouTube tutorial video by Chris Blakely, which was later abandoned and pivoted into a full-scale event management platform. The commit history starts fresh from that pivot point, with the original tutorial work serving only as the initial structural reference.
 
-Qeue is a learning portfolio project for building a small Java event-management platform. The target system is a microservice web platform where organizers publish events and attendees reserve seats without overselling capacity.
+Qeue is a Java/Spring event-management platform for organizers and attendees. It is a learning portfolio project that started from an abandoned patient-management tutorial structure and was pivoted into a Cvent-inspired event platform.
 
-## Current Local State
+The current product goal is simple: organizers can build and publish events, attendees can register without overselling capacity, and organizers can run basic event operations such as attendee management, check-in, analytics, notifications, and surveys.
 
-This repository now targets a full local Qeue platform: event setup, registration, attendee tickets, check-in, analytics, surveys, notifications, Compose, local Kubernetes manifests, and CI.
+## Current Feature Scope
 
-- `event-service/` is a Spring Boot REST CRUD service for event records.
-- `registration-service/` is a Spring Boot gRPC stub for creating a registration response.
-- `services/event-service/` owns event lifecycle, builder fields, registration questions, registration types, speakers, sessions, surveys, event outbox rows, and event projection messages.
-- `services/registration-service/` owns attendee registrations, answers, tickets, check-in, attendee lists, CSV export, analytics, survey responses, projected event inventory, and registration outbox rows.
-- `services/identity-service/` provides registration, login, `/api/auth/me`, BCrypt password hashes, HMAC-SHA256 JWTs, Flyway migrations, and integration tests.
-- `services/gateway-service/` validates JWTs, guards routes by role, proxies downstream APIs, and forwards trusted user headers.
-- `services/notification-worker/` consumes registration notification events, deduplicates them, writes notification logs, and can send to MailHog when enabled.
-- `web-client/` is a React/Vite TypeScript client for public browsing, auth, organizer setup, attendee registration, ticket display, check-in, analytics, and surveys.
-- `contracts/openapi/` and `contracts/asyncapi/` contain route and event contracts.
-- `api-requests/event-service/` contains manual HTTP request examples for event endpoints.
-- `grpc-requests/registration-service/` contains a manual gRPC request example for the registration stub.
-- `api-requests/registration-service/` contains manual HTTP request examples for registration endpoints.
-- `codex-folder/` contains concise project memory, current status, architecture notes, and implementation progress.
-- `codex-folder/explain/project-explanation.md` gives a short beginner-friendly explanation.
+The active implementation covers the Cvent-inspired event-platform scope:
 
-## Requirements
+- Event builder fields: format, category, banner image, venue, timezone, start/end time, capacity, draft/publish/cancel lifecycle.
+- Registration questions and stored attendee answers.
+- Registration types with per-type capacity enforcement.
+- Agenda, sessions, and speakers.
+- Organizer attendee list with status/type/search filters, sorting, registration detail data, and CSV export.
+- Ticket-code check-in with hashed ticket codes.
+- Notification templates and notification logs for registration and check-in events.
+- Event analytics: capacity, confirmed/cancelled registrations, available seats, check-ins, no-shows, and type breakdown.
+- Post-event survey definitions and attendee survey submissions.
+- OpenAPI and AsyncAPI contracts for HTTP APIs and RabbitMQ event messages.
 
-- Java 21
-- Maven through each service's Maven wrapper
-- Docker is required for Compose, image builds, and registration-service Testcontainers tests
-- Node 22 LTS or newer and npm for `web-client`
-- `kubectl` with kustomize support for manifest validation or local Kubernetes apply
+Public event pages show total capacity. Remaining capacity is available to organizers through analytics; it is not exposed on public event detail because registration capacity is owned by `registration-service` and the project avoids cross-service database reads.
 
-## Run Checks
+## Architecture
 
-From `event-service/`:
+Active runtime code lives under `services/` and `web-client/`.
+
+| Component | Port | Responsibility |
+| --- | ---: | --- |
+| `services/identity-service` | `4001` | User registration, login, BCrypt password hashing, JWT issuing, `/api/auth/me`. |
+| `services/gateway-service` | `8080` | Browser-facing API gateway, JWT validation, role checks, downstream proxy routing. |
+| `services/event-service` | `4000` | Event lifecycle, event setup, registration-question definitions, registration-type definitions, speakers, sessions, surveys, event outbox. |
+| `services/registration-service` | `4002`, gRPC `9001` | Registration correctness, event inventory projection, registration answers, tickets, check-in, attendee lists, CSV export, analytics, survey submissions, registration outbox. |
+| `services/notification-worker` | `4003` | RabbitMQ notification consumer, template rendering, notification logs, optional MailHog SMTP delivery. |
+| `web-client` | Compose `3000`, Vite `5173` | React/Vite browser UI for public browsing, auth, organizer workflows, attendee registration, tickets, check-in, analytics, and surveys. |
+
+The root-level `event-service/` and `registration-service/` folders are older tutorial/stub service paths. They are not used by Docker Compose, Kubernetes, or the current browser workflow.
+
+## Tech Stack
+
+- Java 21 and Spring Boot 4 for the backend services.
+- Spring MVC for HTTP APIs.
+- Spring Security for stateless JWT-protected gateway and identity routes.
+- Spring Data JPA and Flyway for relational persistence and migrations.
+- PostgreSQL 16 for local service databases.
+- H2 for most fast service tests; Testcontainers PostgreSQL for registration concurrency tests.
+- RabbitMQ topic exchange plus transactional outbox tables for cross-service event propagation.
+- gRPC in `registration-service` for the retained registration stub interface.
+- React 19, TypeScript, Vite, and React Router for the UI.
+- Docker Compose for the full local developer stack.
+- Kubernetes manifests with Kustomize for local deployment shape validation.
+- MailHog for local email inspection when notification delivery is enabled.
+
+Why these tools:
+
+- Docker Compose gives one command to run the complete local platform.
+- Kubernetes manifests document the deployable service shape without requiring Kubernetes for daily development.
+- RabbitMQ plus outbox keeps event publication durable enough for a microservice learning project.
+- Flyway keeps schema changes explicit and repeatable across local, test, and container runs.
+- Gateway-owned JWT validation keeps browser clients pointed at one API origin and prevents direct trust in user-supplied service headers.
+
+## Prerequisites
+
+- Java 21.
+- Docker with Docker Compose.
+- Node 22 LTS or newer and npm.
+- `kubectl` only if validating or applying Kubernetes manifests.
+- `kind` only if running the Kubernetes walkthrough.
+
+## Run The Full Local App
+
+From the repository root:
 
 ```sh
-./mvnw test
-```
-
-From `registration-service/`:
-
-```sh
-./mvnw test
-```
-
-From active service locations:
-
-```sh
-cd services/event-service && ./mvnw test
-cd services/identity-service && ./mvnw test
-cd services/gateway-service && ./mvnw test
-cd services/registration-service && ./mvnw test
-cd services/notification-worker && ./mvnw test
-cd web-client && npm install && npm test && npm run build
-```
-
-From the repository root, start the full local platform:
-
-```sh
+cp .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Open `http://localhost:3000`. Gateway is available at `http://localhost:8080`.
+Open the UI:
 
-Stop the platform:
+```text
+http://localhost:3000
+```
+
+Useful local URLs:
+
+- Web UI: `http://localhost:3000`
+- Gateway API: `http://localhost:8080`
+- RabbitMQ management: `http://localhost:15672`
+- MailHog: `http://localhost:8025`
+
+Local seed accounts:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Organizer | `organizer@qeue.local` | `LocalDevPassword1!` |
+| Attendee | `attendee@qeue.local` | `LocalDevPassword1!` |
+
+Stop the stack:
 
 ```sh
 docker compose -f infra/docker-compose.yml down
 ```
 
-If your filesystem loses executable bits, run the same commands through `sh ./mvnw test` and restore the wrapper permissions before committing.
-
-Run event-service locally with the default in-memory database:
+Reset local database and broker volumes:
 
 ```sh
-cd services/event-service
-./mvnw spring-boot:run
+docker compose -f infra/docker-compose.yml down -v
 ```
 
-Run event-service against local Postgres after starting Compose:
+## Run The UI In Vite Dev Mode
+
+Use this when you want hot reload while the backend services run in Compose:
+
+```sh
+docker compose -f infra/docker-compose.yml up --build postgres rabbitmq mailhog identity-service event-service registration-service notification-worker gateway-service
+cd web-client
+npm install
+VITE_API_BASE_URL=http://localhost:8080 npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+## Run Services Individually
+
+Start shared infrastructure first:
+
+```sh
+docker compose -f infra/docker-compose.yml up postgres rabbitmq mailhog
+```
+
+Then run services from their active folders. Example:
 
 ```sh
 cd services/event-service
 EVENT_DB_URL=jdbc:postgresql://localhost:5432/qeue_event \
 EVENT_DB_USERNAME=qeue_event_user \
 EVENT_DB_PASSWORD=change-me-local-only \
+RABBITMQ_HOST=localhost \
 ./mvnw spring-boot:run
 ```
 
-Useful local checks:
+Use the same pattern for:
+
+- `services/identity-service`
+- `services/registration-service`
+- `services/notification-worker`
+- `services/gateway-service`
+
+Required local secrets and connection values are listed in `.env.example`.
+
+## Verification
+
+Backend service tests:
 
 ```sh
-curl http://localhost:4000/api/internal/health
-curl http://localhost:4000/api/events
+cd services/identity-service && ./mvnw test
+cd services/event-service && ./mvnw test
+cd services/registration-service && ./mvnw test
+cd services/gateway-service && ./mvnw test
+cd services/notification-worker && ./mvnw test
 ```
 
-Run identity-service against local Postgres after starting Compose:
+`services/registration-service` tests require Docker because they use Testcontainers PostgreSQL for capacity and concurrency checks.
 
-```sh
-cd services/identity-service
-IDENTITY_DB_URL=jdbc:postgresql://localhost:5432/qeue_identity \
-IDENTITY_DB_USERNAME=qeue_identity_user \
-IDENTITY_DB_PASSWORD=change-me-local-only \
-IDENTITY_JWT_SECRET=replace-with-local-identity-secret-min-32-chars \
-./mvnw spring-boot:run
-```
-
-Local seed accounts are development-only and both use password `LocalDevPassword1!`:
-
-- `organizer@qeue.local` with role `ORGANIZER`
-- `attendee@qeue.local` with role `ATTENDEE`
-
-Run the gateway after identity-service, event-service, and registration-service are running.
-
-```sh
-cd services/gateway-service
-IDENTITY_JWT_SECRET=replace-with-local-identity-secret-min-32-chars \
-./mvnw spring-boot:run
-```
-
-Gateway checks:
-
-```sh
-curl http://localhost:8080/api/internal/health
-curl http://localhost:8080/api/events
-```
-
-Run registration-service against local Postgres after starting Compose:
-
-```sh
-cd services/registration-service
-REGISTRATION_DB_URL=jdbc:postgresql://localhost:5432/qeue_registration \
-REGISTRATION_DB_USERNAME=qeue_registration_user \
-REGISTRATION_DB_PASSWORD=change-me-local-only \
-./mvnw spring-boot:run
-```
-
-Run the notification-worker against local Postgres after starting Compose:
-
-```sh
-cd services/notification-worker
-NOTIFICATION_DB_URL=jdbc:postgresql://localhost:5432/qeue_notification \
-NOTIFICATION_DB_USERNAME=qeue_notification_user \
-NOTIFICATION_DB_PASSWORD=change-me-local-only \
-./mvnw spring-boot:run
-```
-
-Enable RabbitMQ publishers and listeners only after RabbitMQ is running:
-
-```sh
-RABBITMQ_LISTENER_ENABLED=true
-EVENT_OUTBOX_PUBLISHER_ENABLED=true
-REGISTRATION_OUTBOX_PUBLISHER_ENABLED=true
-```
-
-Run the web client locally:
+Frontend checks:
 
 ```sh
 cd web-client
-npm install
-VITE_API_BASE_URL=http://localhost:8080 npm run dev
+npm test
+npm run build
 ```
 
-Validate Kubernetes manifests:
+Kubernetes manifest validation:
 
 ```sh
 kubectl kustomize deploy/k8s/overlays/local
 ```
 
-After event-service, identity-service, registration-service, and gateway-service are running, use the seed attendee through the gateway:
+## API Contracts
+
+- Identity API: `contracts/openapi/identity-api.yaml`
+- Event API: `contracts/openapi/event-api.yaml`
+- Registration API: `contracts/openapi/registration-api.yaml`
+- Platform events: `contracts/asyncapi/event-platform-events.yaml`
+
+Manual request examples live in `api-requests/` and `grpc-requests/`.
+
+For a full file-by-file project walkthrough, read `explanation.md`.
+
+## Local Kubernetes
+
+Build images, load them into kind, apply manifests, and port-forward the web client:
 
 ```sh
-curl -X POST http://localhost:8080/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"attendee@qeue.local","password":"LocalDevPassword1!"}'
-curl http://localhost:8080/api/me/registrations \
-  -H "Authorization: Bearer <accessToken>"
+docker build -t qeue/identity-service:local services/identity-service
+docker build -t qeue/event-service:local services/event-service
+docker build -t qeue/registration-service:local services/registration-service
+docker build -t qeue/notification-worker:local services/notification-worker
+docker build -t qeue/gateway-service:local services/gateway-service
+docker build -t qeue/web-client:local web-client
+kind load docker-image qeue/identity-service:local qeue/event-service:local qeue/registration-service:local qeue/notification-worker:local qeue/gateway-service:local qeue/web-client:local
+kubectl apply -k deploy/k8s/overlays/local
+kubectl -n qeue-local get pods
+kubectl -n qeue-local port-forward svc/web-client 3000:80
 ```
 
-## Local Configuration
+Open `http://localhost:3000`.
 
-Copy `.env.example` to `.env` for local-only values when later phases need environment variables. Keep `.env` out of Git. The example file uses dummy local values only and does not contain real credentials.
+## Configuration Notes
 
-## Project Notes
+- `.env.example` contains local-only dummy credentials and ports.
+- Keep real secrets out of Git.
+- `IDENTITY_JWT_SECRET` must be at least 32 bytes.
+- `RABBITMQ_LISTENER_ENABLED`, `EVENT_OUTBOX_PUBLISHER_ENABLED`, and `REGISTRATION_OUTBOX_PUBLISHER_ENABLED` are enabled in Compose for the full platform.
+- `MAILHOG_ENABLED=true` sends rendered notification emails to MailHog; otherwise notification logs are still recorded with status `SKIPPED`.
 
-- `codex-folder/codex/ProjectSummary.md` has architecture, boundaries, troubleshooting notes, and the legacy map.
-- `codex-folder/codex/Progress.md` has current status.
-- `codex-folder/codex/BuildFlow.md` has concise verification commands.
-- `codex-folder/codex/RepoStructure.md` explains the active folders.
-- `contracts/asyncapi/event-platform-events.yaml` has the queue contract.
+## CI
+
+GitHub Actions runs:
+
+- Maven tests for all active backend services.
+- npm test and production build for `web-client`.
+- Docker image builds.
+- Kubernetes Kustomize validation.
+- `git diff --check`.

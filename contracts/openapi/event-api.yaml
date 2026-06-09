@@ -505,7 +505,7 @@ components:
   schemas:
     EventRequest:
       type: object
-      required: [title, description, eventFormat, venueName, venueCity, timezone, startsAt, endsAt, capacity]
+      required: [title, description, eventFormat, category, venueName, venueCity, venueAddress, timezone, startsAt, endsAt, capacity]
       properties:
         title:
           type: string
@@ -537,23 +537,59 @@ components:
           type: integer
           minimum: 1
     EventSummary:
-      allOf:
-        - $ref: "#/components/schemas/EventRequest"
-        - type: object
-          required: [id, organizerId, status]
-          properties:
-            id:
-              type: string
-              format: uuid
-            organizerId:
-              type: string
-              format: uuid
-            status:
-              type: string
-              enum: [DRAFT, PUBLISHED, CANCELLED]
+      type: object
+      required: [id, organizerId, title, eventFormat, category, venueName, venueCity, venueAddress, timezone, startsAt, endsAt, capacity, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizerId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        eventFormat:
+          type: string
+          enum: [IN_PERSON, ONLINE, HYBRID]
+        category:
+          type: string
+        bannerImageUrl:
+          type: string
+          nullable: true
+        venueName:
+          type: string
+        venueCity:
+          type: string
+        venueAddress:
+          type: string
+        timezone:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, CANCELLED]
     EventDetail:
       allOf:
         - $ref: "#/components/schemas/EventSummary"
+        - type: object
+          required: [description, createdAt, updatedAt]
+          properties:
+            description:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
     RegistrationQuestionRequest:
       type: object
       required: [questionText, questionType, required, sortOrder, active]
@@ -583,7 +619,7 @@ components:
               format: uuid
     RegistrationTypeRequest:
       type: object
-      required: [name, capacity, active, sortOrder]
+      required: [name, description, capacity, active, sortOrder]
       properties:
         name:
           type: string
@@ -610,7 +646,7 @@ components:
               format: uuid
     SpeakerRequest:
       type: object
-      required: [name]
+      required: [name, title, organization, bio]
       properties:
         name:
           type: string
@@ -636,7 +672,7 @@ components:
               format: uuid
     SessionRequest:
       type: object
-      required: [title, startsAt, endsAt, status]
+      required: [title, description, startsAt, endsAt, roomName, capacity, status]
       properties:
         title:
           type: string
@@ -652,7 +688,7 @@ components:
           type: string
         capacity:
           type: integer
-          nullable: true
+          minimum: 1
         status:
           type: string
           enum: [DRAFT, PUBLISHED, CANCELLED]
@@ -705,14 +741,34 @@ components:
           type: integer
     Survey:
       allOf:
-        - $ref: "#/components/schemas/SurveyRequest"
         - type: object
-          required: [id, eventId]
+          required: [id, eventId, title, status, questions]
           properties:
             id:
               type: string
               format: uuid
             eventId:
+              type: string
+              format: uuid
+            title:
+              type: string
+            status:
+              type: string
+              enum: [DRAFT, ACTIVE, CLOSED]
+            questions:
+              type: array
+              items:
+                $ref: "#/components/schemas/SurveyQuestion"
+    SurveyQuestion:
+      allOf:
+        - $ref: "#/components/schemas/SurveyQuestionRequest"
+        - type: object
+          required: [id, surveyId]
+          properties:
+            id:
+              type: string
+              format: uuid
+            surveyId:
               type: string
               format: uuid
     ApiError:

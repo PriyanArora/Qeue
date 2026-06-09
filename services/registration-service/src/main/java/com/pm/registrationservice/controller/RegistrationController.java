@@ -75,14 +75,16 @@ public class RegistrationController {
                                                                              @RequestHeader(name = "X-User-Role", required = false) String role,
                                                                              @RequestParam(required = false) String status,
                                                                              @RequestParam(required = false) UUID registrationTypeId,
-                                                                             @RequestParam(required = false) String query) {
+                                                                             @RequestParam(required = false) String query,
+                                                                             @RequestParam(required = false) String sort) {
         requireOrganizer(role);
         return registrationService.listOrganizerRegistrations(
                 requireUserId(userId),
                 eventId,
-                status == null || status.isBlank() ? null : com.pm.registrationservice.model.RegistrationStatus.valueOf(status),
+                parseRegistrationStatus(status),
                 registrationTypeId,
-                query
+                query,
+                sort
         );
     }
 
@@ -173,6 +175,17 @@ public class RegistrationController {
     private void requireOrganizer(String role) {
         if (!"ORGANIZER".equals(role)) {
             throw new ForbiddenException("Organizer role is required");
+        }
+    }
+
+    private com.pm.registrationservice.model.RegistrationStatus parseRegistrationStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        try {
+            return com.pm.registrationservice.model.RegistrationStatus.valueOf(status);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Registration status filter is invalid");
         }
     }
 }

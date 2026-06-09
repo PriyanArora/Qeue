@@ -196,6 +196,128 @@ class EventControllerIntegrationTests {
         assertTrue(rabbitTemplate.wasPublished("qeue.events", "event.published.v1"));
     }
 
+    @Test
+    void organizerCanConfigureQuestionsTypesSpeakersSessionsAndSurveys() throws Exception {
+        String eventResponse = createDraftEvent("Setup Flow " + UUID.randomUUID(), 40);
+        String eventId = objectMapper.readTree(eventResponse).get("id").asText();
+        Instant eventStart = Instant.parse(objectMapper.readTree(eventResponse).get("startsAt").asText());
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/registration-questions", eventId)
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "questionText", "Dietary restrictions?",
+                                "questionType", "TEXT",
+                                "required", true,
+                                "sortOrder", 1,
+                                "active", true
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.required").value(true));
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/registration-types", eventId)
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Student",
+                                "description", "Student attendee",
+                                "capacity", 10,
+                                "active", true,
+                                "sortOrder", 1
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Student"));
+
+        String speakerResponse = mockMvc.perform(post("/api/organizer/events/{eventId}/speakers", eventId)
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Ada Lovelace",
+                                "title", "Speaker",
+                                "organization", "Analytical Engines",
+                                "bio", "Computing pioneer",
+                                "photoUrl", ""
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Ada Lovelace"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String speakerId = objectMapper.readTree(speakerResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/sessions", eventId)
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Opening Session",
+                                "description", "Kickoff",
+                                "startsAt", eventStart.plusSeconds(600),
+                                "endsAt", eventStart.plusSeconds(1800),
+                                "roomName", "Main room",
+                                "capacity", 30,
+                                "status", "PUBLISHED",
+                                "speakerIds", List.of(speakerId)
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.speakers[0].name").value("Ada Lovelace"));
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/surveys", eventId)
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Post-event feedback",
+                                "status", "ACTIVE",
+                                "questions", List.of(Map.of(
+                                        "questionText", "How was it?",
+                                        "questionType", "TEXT",
+                                        "required", true,
+                                        "sortOrder", 1
+                                ))
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.questions[0].questionText").value("How was it?"));
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/publish", eventId)
+                        .headers(organizerHeaders()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/events/{eventId}/registration-questions", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].questionText").value("Dietary restrictions?"));
+        mockMvc.perform(get("/api/events/{eventId}/registration-types", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Student"));
+        mockMvc.perform(get("/api/events/{eventId}/sessions", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("Opening Session"));
+        mockMvc.perform(get("/api/events/{eventId}/surveys/active", eventId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Post-event feedback"));
+    }
+
+    @Test
+    void rejectsSessionOutsideEventTimeRange() throws Exception {
+        String eventResponse = createDraftEvent("Session Validation " + UUID.randomUUID(), 20);
+        String eventId = objectMapper.readTree(eventResponse).get("id").asText();
+        Instant eventEnd = Instant.parse(objectMapper.readTree(eventResponse).get("endsAt").asText());
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/sessions", eventId)
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "Late Session",
+                                "description", "Outside event",
+                                "startsAt", eventEnd.plusSeconds(600),
+                                "endsAt", eventEnd.plusSeconds(1800),
+                                "roomName", "Main room",
+                                "capacity", 20,
+                                "status", "PUBLISHED",
+                                "speakerIds", List.of()
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Session must be inside event time range"));
+    }
+
     private org.springframework.http.HttpHeaders organizerHeaders() {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.add("X-User-Id", ORGANIZER_ID.toString());
@@ -218,6 +340,17 @@ class EventControllerIntegrationTests {
                 Map.entry("endsAt", Instant.now().plusSeconds(90000)),
                 Map.entry("capacity", capacity)
         ));
+    }
+
+    private String createDraftEvent(String title, int capacity) throws Exception {
+        return mockMvc.perform(post("/api/organizer/events")
+                        .headers(organizerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(eventRequest(title, capacity)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
     }
 
     @TestConfiguration

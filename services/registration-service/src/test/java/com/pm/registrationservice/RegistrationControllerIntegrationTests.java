@@ -8,6 +8,7 @@ import com.pm.registrationservice.model.*;
 import com.pm.registrationservice.repository.EventInventoryRepository;
 import com.pm.registrationservice.repository.RegistrationOutboxRepository;
 import com.pm.registrationservice.repository.RegistrationRepository;
+import com.pm.registrationservice.repository.RegistrationTypeInventoryRepository;
 import com.pm.registrationservice.service.RegistrationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -73,6 +74,9 @@ class RegistrationControllerIntegrationTests {
 
     @Autowired
     private RegistrationOutboxRepository outboxRepository;
+
+    @Autowired
+    private RegistrationTypeInventoryRepository typeInventoryRepository;
 
     @Autowired
     private RegistrationService registrationService;
@@ -385,9 +389,219 @@ class RegistrationControllerIntegrationTests {
         );
     }
 
+    @Test
+    void organizerCanFilterSortAndExportRegistrationAnswers() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID organizerId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        EventInventory inventory = inventory(eventId, 5, 0, EventStatus.PUBLISHED);
+        inventory.setOrganizerId(organizerId);
+        inventoryRepository.saveAndFlush(inventory);
+
+        register(eventId, UUID.randomUUID(), "zulu@example.com", "zulu-key", List.of());
+        register(eventId, UUID.randomUUID(), "alpha@example.com", "alpha-key", List.of(Map.of(
+                "questionId", questionId,
+                "answerText", "Vegetarian"
+        )));
+
+        mockMvc.perform(get("/api/organizer/events/{eventId}/registrations", eventId)
+                        .headers(organizerHeaders(organizerId))
+                        .queryParam("query", "example.com")
+                        .queryParam("sort", "emailAsc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].attendeeEmail").value("alpha@example.com"))
+                .andExpect(jsonPath("$[0].answers[0].answerText").value("Vegetarian"));
+
+        mockMvc.perform(get("/api/organizer/events/{eventId}/registrations/export.csv", eventId)
+                        .headers(organizerHeaders(organizerId)))
+                .andExpect(status().isOk())
+                .andExpect(content -> assertTrue(content.getResponse().getContentAsString().contains(questionId + "=Vegetarian")));
+    }
+
+    @Test
+    void organizerCannotReadAnotherOrganizersRegistrations() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        EventInventory inventory = inventory(eventId, 5, 0, EventStatus.PUBLISHED);
+        inventory.setOrganizerId(UUID.randomUUID());
+        inventoryRepository.saveAndFlush(inventory);
+
+        mockMvc.perform(get("/api/organizer/events/{eventId}/registrations", eventId)
+                        .headers(organizerHeaders(UUID.randomUUID())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Organizer does not own this event"));
+    }
+
+    @Test
+    void checkInUsesTicketCodeOnceAndRejectsCancelledRegistrations() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID organizerId = UUID.randomUUID();
+        UUID attendeeId = UUID.randomUUID();
+        EventInventory inventory = inventory(eventId, 5, 0, EventStatus.PUBLISHED);
+        inventory.setOrganizerId(organizerId);
+        inventoryRepository.saveAndFlush(inventory);
+
+        String registrationId = registerAndReadId(eventId, attendeeId, "ticket@example.com", "ticket-key");
+        String ticketResponse = mockMvc.perform(get("/api/me/registrations/{registrationId}/ticket", registrationId)
+                        .headers(attendeeHeaders(attendeeId, "ticket@example.com")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String ticketCode = objectMapper.readTree(ticketResponse).get("ticketCode").asText();
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/check-in", eventId)
+                        .headers(organizerHeaders(organizerId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("ticketCode", ticketCode))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CHECKED_IN"));
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/check-in", eventId)
+                        .headers(organizerHeaders(organizerId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("ticketCode", ticketCode))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CHECKED_IN"));
+
+        UUID cancelledAttendeeId = UUID.randomUUID();
+        String cancelledRegistrationId = registerAndReadId(eventId, cancelledAttendeeId, "cancelled-ticket@example.com", "cancelled-ticket-key");
+        String cancelledTicketResponse = mockMvc.perform(get("/api/me/registrations/{registrationId}/ticket", cancelledRegistrationId)
+                        .headers(attendeeHeaders(cancelledAttendeeId, "cancelled-ticket@example.com")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String cancelledTicketCode = objectMapper.readTree(cancelledTicketResponse).get("ticketCode").asText();
+
+        mockMvc.perform(delete("/api/registrations/{registrationId}", cancelledRegistrationId)
+                        .headers(attendeeHeaders(cancelledAttendeeId, "cancelled-ticket@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        mockMvc.perform(post("/api/organizer/events/{eventId}/check-in", eventId)
+                        .headers(organizerHeaders(organizerId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("ticketCode", cancelledTicketCode))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cancelled registrations cannot be checked in"));
+    }
+
+    @Test
+    void registrationTypeCapacityIsEnforcedUnderConcurrentRegistrations() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID typeId = UUID.randomUUID();
+        inventoryRepository.saveAndFlush(inventory(eventId, 2, 0, EventStatus.PUBLISHED));
+        typeInventoryRepository.saveAndFlush(typeInventory(eventId, typeId, "Student", 1));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> tryRegister(eventId, UUID.randomUUID(), "type-one@example.com", "type-one", typeId));
+            var second = executor.submit(() -> tryRegister(eventId, UUID.randomUUID(), "type-two@example.com", "type-two", typeId));
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+            int successes = (first.get() ? 1 : 0) + (second.get() ? 1 : 0);
+
+            assertEquals(1, successes);
+            assertEquals(1, inventoryRepository.findById(eventId).orElseThrow().getConfirmedCount());
+            assertEquals(1, typeInventoryRepository.findById(typeId).orElseThrow().getConfirmedCount());
+        }
+    }
+
+    @Test
+    void analyticsCountsConfirmedCancelledCheckInsAndNoShows() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID organizerId = UUID.randomUUID();
+        UUID firstAttendeeId = UUID.randomUUID();
+        UUID secondAttendeeId = UUID.randomUUID();
+        EventInventory inventory = inventory(eventId, 3, 0, EventStatus.PUBLISHED);
+        inventory.setOrganizerId(organizerId);
+        inventoryRepository.saveAndFlush(inventory);
+
+        String firstRegistrationId = registerAndReadId(eventId, firstAttendeeId, "analytics-one@example.com", "analytics-one");
+        String secondRegistrationId = registerAndReadId(eventId, secondAttendeeId, "analytics-two@example.com", "analytics-two");
+
+        String ticketResponse = mockMvc.perform(get("/api/me/registrations/{registrationId}/ticket", firstRegistrationId)
+                        .headers(attendeeHeaders(firstAttendeeId, "analytics-one@example.com")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        mockMvc.perform(post("/api/organizer/events/{eventId}/check-in", eventId)
+                        .headers(organizerHeaders(organizerId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("ticketCode", objectMapper.readTree(ticketResponse).get("ticketCode").asText()))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/registrations/{registrationId}", secondRegistrationId)
+                        .headers(attendeeHeaders(secondAttendeeId, "analytics-two@example.com")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/organizer/events/{eventId}/analytics", eventId)
+                        .headers(organizerHeaders(organizerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(3))
+                .andExpect(jsonPath("$.confirmedRegistrations").value(1))
+                .andExpect(jsonPath("$.cancelledRegistrations").value(1))
+                .andExpect(jsonPath("$.availableSeats").value(2))
+                .andExpect(jsonPath("$.checkIns").value(1))
+                .andExpect(jsonPath("$.noShows").value(0));
+    }
+
+    @Test
+    void surveySubmissionRequiresConfirmedRegistrationAndRejectsDuplicateSubmission() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID organizerId = UUID.randomUUID();
+        UUID attendeeId = UUID.randomUUID();
+        UUID surveyId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        EventInventory inventory = inventory(eventId, 5, 0, EventStatus.PUBLISHED);
+        inventory.setOrganizerId(organizerId);
+        inventoryRepository.saveAndFlush(inventory);
+        registerAndReadId(eventId, attendeeId, "survey@example.com", "survey-registration");
+
+        String requestBody = objectMapper.writeValueAsString(Map.of("answers", List.of(Map.of(
+                "questionId", questionId,
+                "answerText", "Useful"
+        ))));
+        mockMvc.perform(post("/api/events/{eventId}/surveys/{surveyId}/responses", eventId, surveyId)
+                        .headers(attendeeHeaders(attendeeId, "survey@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.answers[0].answerText").value("Useful"));
+
+        mockMvc.perform(post("/api/events/{eventId}/surveys/{surveyId}/responses", eventId, surveyId)
+                        .headers(attendeeHeaders(attendeeId, "survey@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Survey already submitted"));
+
+        mockMvc.perform(post("/api/events/{eventId}/surveys/{surveyId}/responses", eventId, surveyId)
+                        .headers(attendeeHeaders(UUID.randomUUID(), "not-registered@example.com"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Only confirmed attendees can submit this survey"));
+
+        mockMvc.perform(get("/api/organizer/events/{eventId}/surveys/{surveyId}/responses", eventId, surveyId)
+                        .headers(organizerHeaders(organizerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].surveyId").value(surveyId.toString()));
+    }
+
     private boolean tryRegister(UUID eventId, UUID attendeeId, String email, String idempotencyKey) {
         try {
             registrationService.register(eventId, attendeeId, email, new RegistrationRequestDTO(idempotencyKey, null, List.of()));
+            return true;
+        } catch (ConflictException ex) {
+            return false;
+        }
+    }
+
+    private boolean tryRegister(UUID eventId, UUID attendeeId, String email, String idempotencyKey, UUID registrationTypeId) {
+        try {
+            registrationService.register(eventId, attendeeId, email, new RegistrationRequestDTO(idempotencyKey, registrationTypeId, List.of()));
             return true;
         } catch (ConflictException ex) {
             return false;
@@ -399,6 +613,13 @@ class RegistrationControllerIntegrationTests {
         headers.add("X-User-Id", attendeeId.toString());
         headers.add("X-User-Email", attendeeEmail);
         headers.add("X-User-Role", "ATTENDEE");
+        return headers;
+    }
+
+    private org.springframework.http.HttpHeaders organizerHeaders(UUID organizerId) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("X-User-Id", organizerId.toString());
+        headers.add("X-User-Role", "ORGANIZER");
         return headers;
     }
 
@@ -432,6 +653,17 @@ class RegistrationControllerIntegrationTests {
         return objectMapper.readTree(response).get("registrationId").asText();
     }
 
+    private void register(UUID eventId, UUID attendeeId, String email, String idempotencyKey, List<Map<String, Object>> answers) throws Exception {
+        mockMvc.perform(post("/api/events/{eventId}/registrations", eventId)
+                        .headers(attendeeHeaders(attendeeId, email))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "idempotencyKey", idempotencyKey,
+                                "answers", answers
+                        ))))
+                .andExpect(status().isCreated());
+    }
+
     private EventInventory inventory(UUID eventId, int capacity, int confirmedCount, EventStatus status) {
         EventInventory inventory = new EventInventory();
         inventory.setEventId(eventId);
@@ -458,5 +690,16 @@ class RegistrationControllerIntegrationTests {
         registration.setActiveRegistrationKey(RegistrationStatus.CONFIRMED.name());
         registration.setCreatedAt(Instant.now());
         return registration;
+    }
+
+    private RegistrationTypeInventory typeInventory(UUID eventId, UUID typeId, String name, int capacity) {
+        RegistrationTypeInventory inventory = new RegistrationTypeInventory();
+        inventory.setRegistrationTypeId(typeId);
+        inventory.setEventId(eventId);
+        inventory.setName(name);
+        inventory.setCapacity(capacity);
+        inventory.setConfirmedCount(0);
+        inventory.setActive(true);
+        return inventory;
     }
 }

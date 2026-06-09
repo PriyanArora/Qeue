@@ -21,7 +21,8 @@ paths:
               attendee:
                 value:
                   email: attendee@qeue.local
-                  password: password123
+                  password: LocalDevPassword1!
+                  displayName: Local Attendee
                   role: ATTENDEE
       responses:
         "201":
@@ -48,7 +49,7 @@ paths:
               organizer:
                 value:
                   email: organizer@qeue.local
-                  password: password123
+                  password: LocalDevPassword1!
       responses:
         "200":
           description: Auth token.
@@ -98,7 +99,7 @@ components:
   schemas:
     RegisterRequest:
       type: object
-      required: [email, password, role]
+      required: [email, password, displayName, role]
       properties:
         email:
           type: string
@@ -106,6 +107,8 @@ components:
         password:
           type: string
           minLength: 8
+        displayName:
+          type: string
         role:
           type: string
           enum: [ORGANIZER, ATTENDEE]
@@ -120,22 +123,39 @@ components:
           type: string
     AuthResponse:
       type: object
-      required: [token, user]
+      required: [userId, email, displayName, role, tokenType, accessToken, expiresAt]
       properties:
-        token:
-          type: string
-        user:
-          $ref: "#/components/schemas/User"
-    User:
-      type: object
-      required: [id, email, role]
-      properties:
-        id:
+        userId:
           type: string
           format: uuid
         email:
           type: string
           format: email
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [ORGANIZER, ATTENDEE]
+        tokenType:
+          type: string
+          example: Bearer
+        accessToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    User:
+      type: object
+      required: [userId, email, displayName, role]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
         role:
           type: string
           enum: [ORGANIZER, ATTENDEE]
